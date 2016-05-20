@@ -5,6 +5,7 @@ exports.install = () => {
     throw new Error('React DevTools cannot be installed from within the main process.')
   }
   console.log(`Installing React Devtron from ${__dirname}`)
+  require('./build/inject');
   return electron.remote.BrowserWindow.addDevToolsExtension(__dirname)
 }
 

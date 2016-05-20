@@ -2,6 +2,21 @@
 
 It's not working yet. because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron(v1.1.0).
 
+## Installing
+
+```sh
+npm install --save-dev firejune/react-devtron
+```
+
+Then execute the following from the Console tab of your running Electron app's
+developer tools:
+
+```js
+require('react-devtron').install()
+```
+
+You should then see a `Devtron` tab added.
+
 ## To hack on the plugin
 
 - run `npm install`
