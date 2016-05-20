@@ -15,7 +15,7 @@ developer tools:
 require('react-devtron').install()
 ```
 
-You should then see a `Devtron` tab added.
+You should then see a `React` tab added.
 
 ## To hack on the plugin
 
