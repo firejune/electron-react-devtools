@@ -1,3 +1,7 @@
-.DS_Store
+.babelrc
+.eslintignore
+.eslintrc
+.npmignore
+/build/react-devtools-chrome.zip
 /scripts
 /src
