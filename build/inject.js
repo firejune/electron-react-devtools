@@ -60,7 +60,7 @@
 	// devtools are installed (and skip its suggestion to install the devtools).
 
 	var installGlobalHook = __webpack_require__(1);
-	var installRelayHook = __webpack_require__(3);
+	var installRelayHook = __webpack_require__(2);
 
 	var saveNativeValues = '\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeObjectCreate = Object.create;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeMap = Map;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeWeakMap = WeakMap;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeSet = Set;\n';
 
@@ -75,7 +75,7 @@
 
 /***/ },
 /* 1 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
 	/**
 	 * Copyright (c) 2015-present, Facebook, Inc.
@@ -88,8 +88,6 @@
 	 * 
 	 */
 	'use strict';
-
-	var _types = __webpack_require__(2);
 
 	/**
 	 * NOTE: This file cannot `require` any other modules. We `.toString()` the
@@ -150,22 +148,6 @@
 
 /***/ },
 /* 2 */
-/***/ function(module, exports) {
-
-	/**
-	 * Copyright (c) 2015-present, Facebook, Inc.
-	 * All rights reserved.
-	 *
-	 * This source code is licensed under the BSD-style license found in the
-	 * LICENSE file in the root directory of this source tree. An additional grant
-	 * of patent rights can be found in the PATENTS file in the same directory.
-	 *
-	 * 
-	 */
-	'use strict';
-
-/***/ },
-/* 3 */
 /***/ function(module, exports) {
 
 	/**

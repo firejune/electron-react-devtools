@@ -10,13 +10,13 @@
  */
 'use strict';
 
-var Agent = require('../../../agent/Agent');
-var BananaSlugBackendManager = require('../../../plugins/BananaSlug/BananaSlugBackendManager');
-var Bridge = require('../../../agent/Bridge');
-var inject = require('../../../agent/inject');
-var setupHighlighter = require('../../../frontend/Highlighter/setup');
-var setupRNStyle = require('../../../plugins/ReactNativeStyle/setupBackend');
-var setupRelay = require('../../../plugins/Relay/backend');
+var Agent = require('./agent/Agent');
+var BananaSlugBackendManager = require('./plugins/BananaSlug/BananaSlugBackendManager');
+var Bridge = require('./agent/Bridge');
+var inject = require('./agent/inject');
+var setupHighlighter = require('./frontend/Highlighter/setup');
+var setupRNStyle = require('./plugins/ReactNativeStyle/setupBackend');
+var setupRelay = require('./plugins/Relay/backend');
 
 // TODO: check to see if we're in RN before doing this?
 setInterval(function() {

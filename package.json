@@ -46,5 +46,10 @@
     "react-addons-create-fragment": "0.14.3",
     "react-dom": "0.14.3",
     "webpack": "1.12.9"
+  },
+  "scripts": {
+    "pack": "NODE_ENV=production webpack --config scripts/webpack.config.js",
+    "backend": "NODE_ENV=production webpack --config scripts/webpack.backend.js",
+    "build": "npm run pack && npm run backend && scripts/build.sh"
   }
 }

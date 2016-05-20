@@ -13,8 +13,8 @@
 // Inject a `__REACT_DEVTOOLS_GLOBAL_HOOK__` global so that React can detect that the
 // devtools are installed (and skip its suggestion to install the devtools).
 
-var installGlobalHook = require('../../../backend/installGlobalHook.js');
-var installRelayHook = require('../../../plugins/Relay/installRelayHook.js');
+var installGlobalHook = require('./backend/installGlobalHook.js');
+var installRelayHook = require('./plugins/Relay/installRelayHook.js');
 
 var saveNativeValues = `
 window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeObjectCreate = Object.create;

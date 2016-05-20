@@ -6,9 +6,6 @@ SHELL_DIR=$PWD
 # GNU mktemp requires the XXXX placeholder
 PACKAGE_TMP=$(mktemp -d -t devtools.XXXX)
 
-NODE_ENV=production ../../node_modules/.bin/webpack --config webpack.config.js
-NODE_ENV=production ../../node_modules/.bin/webpack --config webpack.backend.js
-
 mkdir "$PACKAGE_TMP/react-devtools-chrome/"
 rsync -R \
   build/backend.js \

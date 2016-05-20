@@ -15,7 +15,7 @@
 var checkForReact = require('./checkForReact');
 var inject = require('./inject');
 
-import type {Props} from '../../../frontend/Panel';
+import type {Props} from './frontend/Panel';
 
 var config: Props = {
   reload,
@@ -94,7 +94,7 @@ var config: Props = {
   },
 };
 
-var Panel = require('../../../frontend/Panel');
+var Panel = require('./frontend/Panel');
 var React = require('react');
 var ReactDOM = require('react-dom');
 
