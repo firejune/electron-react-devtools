@@ -1,4 +1,5 @@
 const electron = require('electron')
+require('./build/inject');
 
 exports.install = () => {
   if (!electron.remote) {
@@ -6,16 +7,11 @@ exports.install = () => {
   }
 
   console.log(`Installing React Devtron from ${__dirname}`)
-  this.inject();
   return electron.remote.BrowserWindow.addDevToolsExtension(__dirname)
 }
 
 exports.uninstall = () => {
   return electron.remote.BrowserWindow.removeDevToolsExtension('React Developer Tools')
-}
-
-exports.inject = () => {
-  require('./build/inject');
 }
 
 exports.path = __dirname

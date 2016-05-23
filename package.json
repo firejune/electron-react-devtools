@@ -1,16 +1,16 @@
 {
-  "name": "react-devtron",
+  "name": "electron-react-devtools",
   "version": "0.14.10",
   "description": "React DevTools Extension for Electron",
   "main": "./api.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/firejune/react-devtron.git"
+    "url": "git+https://github.com/firejune/electron-react-devtools.git"
   },
   "author": "Joon Kyoung",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/firejune/react-devtron/issues"
+    "url": "https://github.com/firejune/electron-react-devtools/issues"
   },
   "keywords": [
     "Electron",
@@ -20,7 +20,7 @@
     "developer tools",
     "React"
   ],
-  "homepage": "https://github.com/electron/react-devtron#readme",
+  "homepage": "https://github.com/electron/electron-react-devtools#readme",
   "devDependencies": {
     "babel-core": "6.3.21",
     "babel-eslint": "4.1.6",
