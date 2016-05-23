@@ -1,4 +1,5 @@
 const electron = require('electron')
+
 require('./build/inject');
 
 exports.install = () => {
