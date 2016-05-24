@@ -23,14 +23,23 @@ setInterval(function() {
   // this is needed to force refresh on react native
 }, 100);
 
+var {EventEmitter} = require('events');
+var sendQueue = [];
+global.__react = new EventEmitter;
+global.__react.appPath = __dirname;
+global.__react.receives = function() {
+  return sendQueue.splice(0);
+};
 
-window.addEventListener('message', welcome);
+__react.addListener('message', welcome);
+
 function welcome(evt) {
+	console.debug('__react.receive.welcome', evt.data);
   if (evt.data.source !== 'react-devtools-content-script') {
     return;
   }
 
-  window.removeEventListener('message', welcome);
+  __react.removeListener('message', welcome);
   setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
 }
 
@@ -38,22 +47,26 @@ function setup(hook) {
   var listeners = [];
 
   var wall = {
-    listen(fn) {
-      var listener = evt => {
+    listen: function listen(fn) {
+      var listener = function listener(evt) {
+	      console.debug('__react.receive.listener', evt);
         if (evt.data.source !== 'react-devtools-content-script' || !evt.data.payload) {
           return;
         }
         fn(evt.data.payload);
       };
       listeners.push(listener);
-      window.addEventListener('message', listener);
+      __react.addListener('message', listener);
     },
-    send(data) {
-      window.postMessage({
-        source: 'react-devtools-bridge',
-        payload: data,
-      }, '*');
-    },
+    send: function send(data) {
+	    console.debug('__react.send', data);
+	    sendQueue.push({
+  	    data: {
+	        source: 'react-devtools-bridge',
+	        payload: data
+	      }
+	    });
+    }
   };
 
   var isReactNative = !!hook.resolveRNStyle;
