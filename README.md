@@ -1,18 +1,18 @@
 # React DevTools for Electron
 
-It's not working yet. because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron(v1.1.0).
+Unfortunately, "React DevTools" not working with Electron... Because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix the source of "React DevTools" for Electron.
 
 ## Installing
 
 ```sh
-npm install --save-dev firejune/react-devtron
+npm install --save-dev firejune/electron-react-devtools
 ```
 
 Then execute the following from the Console tab of your running Electron app's
 developer tools:
 
 ```js
-require('react-devtron').install()
+require('electron-react-devtools').install()
 ```
 
 You should then see a `React` tab added.
