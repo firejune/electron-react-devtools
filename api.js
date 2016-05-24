@@ -1,7 +1,7 @@
 const electron = require('electron')
 
 require('./build/inject');
-global.__REACT_DEVTOOLS_GLOBAL_HOOK__.path = __dirname;
+require('./build/backend');
 
 exports.install = () => {
   if (!electron.remote) {
