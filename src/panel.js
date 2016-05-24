@@ -67,31 +67,61 @@ var config: Props = {
       }
     });
   },
-  inject(done) {
-    inject(chrome.runtime.getURL('build/backend.js'), () => {
-      var port = chrome.runtime.connect({
-        name: '' + chrome.devtools.inspectedWindow.tabId,
-      });
-      var disconnected = false;
-
-      var wall = {
-        listen(fn) {
-          port.onMessage.addListener(message => fn(message));
-        },
-        send(data) {
-          if (disconnected) {
-            return;
-          }
-          port.postMessage(data);
-        },
-      };
-
-      port.onDisconnect.addListener(() => {
-        disconnected = true;
-      });
-      done(wall, () => port.disconnect());
+  getURL(src, done) {
+    var code = 'global.__dirname';
+    chrome.devtools.inspectedWindow.eval(code, (res, err) => {
+      if (err) {
+        console.error('Failed to inspect source', err);
+      }
+      done(res + '/node_modules/react-devtron/' + src);
     });
   },
+  inject(done) {
+    this.getURL('build/backend.js', (source) => {
+	    _inject(source, function () {
+	      var disconnected = false;
+        var wall = {
+          listen(fn) {
+            setInterval(function() {
+              chrome.devtools.inspectedWindow.eval('global.__react.receives()', function(res, err) {
+                if (res && res.length) {
+                  fn(res[0].data.payload);
+                }
+              });
+            }, 100);
+          },
+          send(data) {
+	          if (disconnected) {
+	            return;
+	          }
+
+	          var packet = JSON.stringify({
+  	          data: {
+    	          source: 'react-devtools-content-script',
+    	          payload: data
+  	          }
+  	        });
+
+	          var code = ';\nglobal.__react.emit("message", ' + packet + ');';
+            chrome.devtools.inspectedWindow.eval(code, function (res, err) {
+      	      if (err) {
+      	        return console.error('Failed to call function', err);
+      	      }
+
+      	      if (res === false) {
+        	      console.error(code);
+      	      }
+      	    });
+          }
+        };
+
+    	  done(wall, () => {
+          // TODO disconnect
+          port.disconnect();
+        });
+      });
+    });
+  }
 };
 
 var Panel = require('./frontend/Panel');
