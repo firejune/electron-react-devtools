@@ -2,5 +2,6 @@
 .eslintignore
 .eslintrc
 .npmignore
+/build/react-devtools-chrome.zip
 /scripts
 /src
