@@ -44,109 +44,109 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(global, __dirname) {'use strict';
+	/* WEBPACK VAR INJECTION */(function(global) {/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var Agent = __webpack_require__(59);
+	var BananaSlugBackendManager = __webpack_require__(72);
+	var Bridge = __webpack_require__(60);
+	var inject = __webpack_require__(63);
+	var setupHighlighter = __webpack_require__(71);
+	var setupRNStyle = __webpack_require__(75);
+	var setupRelay = __webpack_require__(76);
 
+	// TODO: check to see if we're in RN before doing this?
+	setInterval(function () {
+	  // this is needed to force refresh on react native
+	}, 100);
 
+	var { EventEmitter } = __webpack_require__(56);
+	var sendQueue = [];
+	global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender = new EventEmitter();
+	global.__REACT_DEVTOOLS_GLOBAL_HOOK__.receiver = function () {
+	  return sendQueue.splice(0);
+	};
 
+	global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', welcome);
 
+	function welcome(evt) {
+	  // console.debug('background.welcome', evt.data);
+	  if (evt.data.source !== 'react-devtools-content-script') {
+	    return;
+	  }
 
+	  global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.removeListener('message', welcome);
+	  setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
+	}
 
+	function setup(hook) {
+	  var listeners = [];
 
+	  var wall = {
+	    listen: function listen(fn) {
+	      var listener = function listener(evt) {
+	        // console.debug('background.receiver', evt);
+	        if (evt.data.source !== 'react-devtools-content-script' || !evt.data.payload) {
+	          return;
+	        }
+	        fn(evt.data.payload);
+	      };
+	      listeners.push(listener);
+	      global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', listener);
+	    },
+	    send: function send(data) {
+	      // console.debug('background.sender', data);
+	      sendQueue.push({
+	        data: {
+	          source: 'react-devtools-bridge',
+	          payload: data
+	        }
+	      });
+	    }
+	  };
 
+	  var isReactNative = !!hook.resolveRNStyle;
 
+	  var bridge = new Bridge(wall);
+	  var agent = new Agent(window, {
+	    rnStyle: isReactNative
+	  });
+	  agent.addBridge(bridge);
 
-	var Agent=__webpack_require__(59);
-	var BananaSlugBackendManager=__webpack_require__(72);
-	var Bridge=__webpack_require__(60);
-	var inject=__webpack_require__(63);
-	var setupHighlighter=__webpack_require__(71);
-	var setupRNStyle=__webpack_require__(75);
-	var setupRelay=__webpack_require__(76);
+	  agent.once('connected', () => {
+	    inject(hook, agent);
+	  });
 
+	  if (isReactNative) {
+	    setupRNStyle(bridge, agent, hook.resolveRNStyle);
+	  }
 
-	setInterval(function(){},
+	  setupRelay(bridge, agent, hook);
 
-	100);
+	  agent.on('shutdown', () => {
+	    hook.emit('shutdown');
+	    listeners.forEach(fn => {
+	      window.removeEventListener('message', fn);
+	    });
+	    listeners = [];
+	  });
 
-	var {EventEmitter}=__webpack_require__(56);
-	var sendQueue=[];
-	global.__react=new EventEmitter();
-	global.__react.appPath=__dirname;
-	global.__react.receives=function(){
-	return sendQueue.splice(0);};
+	  if (!isReactNative) {
+	    setupHighlighter(agent);
+	  }
 
-
-	__react.addListener('message',welcome);
-
-	function welcome(evt){
-
-	if(evt.data.source!=='react-devtools-content-script'){
-	return;}
-
-
-	__react.removeListener('message',welcome);
-	setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);}
-
-
-	function setup(hook){
-	var listeners=[];
-
-	var wall={
-	listen:function listen(fn){
-	var listener=function listener(evt){
-
-	if(evt.data.source!=='react-devtools-content-script'||!evt.data.payload){
-	return;}
-
-	fn(evt.data.payload);};
-
-	listeners.push(listener);
-	__react.addListener('message',listener);},
-
-	send:function send(data){
-
-	sendQueue.push({
-	data:{
-	source:'react-devtools-bridge',
-	payload:data}});}};
-
-
-
-
-
-	var isReactNative=!!hook.resolveRNStyle;
-
-	var bridge=new Bridge(wall);
-	var agent=new Agent(window,{
-	rnStyle:isReactNative});
-
-	agent.addBridge(bridge);
-
-	agent.once('connected',() => {
-	inject(hook,agent);});
-
-
-	if(isReactNative){
-	setupRNStyle(bridge,agent,hook.resolveRNStyle);}
-
-
-	setupRelay(bridge,agent,hook);
-
-	agent.on('shutdown',() => {
-	hook.emit('shutdown');
-	listeners.forEach(fn => {
-	window.removeEventListener('message',fn);});
-
-	listeners=[];});
-
-
-	if(!isReactNative){
-	setupHighlighter(agent);}
-
-
-	BananaSlugBackendManager.init(agent);}
-	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }()), "/"))
+	  BananaSlugBackendManager.init(agent);
+	}
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
 /* 1 */
@@ -940,373 +940,362 @@
 /* 39 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var Symbol = __webpack_require__(135);
 
-
-
-
-
-
-
-
-
-
-	var Symbol=__webpack_require__(135);
-
-	module.exports={
-	name:Symbol('name'),
-	type:Symbol('type'),
-	inspected:Symbol('inspected'),
-	meta:Symbol('meta'),
-	proto:Symbol('proto')};
+	module.exports = {
+	  name: Symbol('name'),
+	  type: Symbol('type'),
+	  inspected: Symbol('inspected'),
+	  meta: Symbol('meta'),
+	  proto: Symbol('proto')
+	};
 
 /***/ },
 /* 40 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(13);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _extends2 = __webpack_require__(13);
 
+	var _extends3 = _interopRequireDefault(_extends2);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	function copyWithSetImpl(obj, path, idx, value) {
+	  if (idx >= path.length) {
+	    return value;
+	  }
+	  var key = path[idx];
+	  var updated = Array.isArray(obj) ? obj.slice() : (0, _extends3.default)({}, obj);
+	  // $FlowFixMe number or string is fine here
+	  updated[key] = copyWithSetImpl(obj[key], path, idx + 1, value);
+	  return updated;
+	}
 
+	function copyWithSet(obj, path, value) {
+	  return copyWithSetImpl(obj, path, 0, value);
+	}
 
-
-
-
-
-
-	function copyWithSetImpl(obj,path,idx,value){
-	if(idx>=path.length){
-	return value;}
-
-	var key=path[idx];
-	var updated=Array.isArray(obj)?obj.slice():(0,_extends3.default)({},obj);
-
-	updated[key]=copyWithSetImpl(obj[key],path,idx+1,value);
-	return updated;}
-
-
-	function copyWithSet(obj,path,value){
-	return copyWithSetImpl(obj,path,0,value);}
-
-
-	module.exports=copyWithSet;
+	module.exports = copyWithSet;
 
 /***/ },
 /* 41 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(13);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	const requestAnimationFrame=__webpack_require__(57);
-	const immutable=__webpack_require__(58);
-
-
-
-
-	const DURATION=800;
-
-	const {Record,Map,Set}=immutable;
-
-	const MeasurementRecord=Record({
-	bottom:0,
-	expiration:0,
-	height:0,
-	id:'',
-	left:0,
-	right:0,
-	scrollX:0,
-	scrollY:0,
-	top:0,
-	width:0});
-
-
-	var _id=100;
-
-	class BananaSlugAbstractNodeMeasurer{
-
-
-
-
-
-
-
-	constructor(){
-
-	this._nodes=new Map();
-
-
-	this._ids=new Map();
-
-
-	this._measurements=new Map();
-
-
-	this._callbacks=new Map();
-
-	this._isRequesting=false;
-
-
-	this._measureNodes=this._measureNodes.bind(this);}
-
-
-	request(node,callback){
-	var requestID=this._nodes.has(node)?
-	this._nodes.get(node):
-	String(_id++);
-
-	this._nodes=this._nodes.set(node,requestID);
-	this._ids=this._ids.set(requestID,node);
-
-	var callbacks=this._callbacks.has(node)?
-	this._callbacks.get(node):
-	new Set();
-
-	callbacks=callbacks.add(callback);
-	this._callbacks=this._callbacks.set(node,callbacks);
-
-	if(this._isRequesting){
-	return requestID;}
-
-
-	this._isRequesting=true;
-	requestAnimationFrame(this._measureNodes);
-	return requestID;}
-
-
-	cancel(requestID){
-	if(this._ids.has(requestID)){
-	var node=this._ids.get(requestID);
-	this._ids=this._ids.delete(requestID);
-	this._nodes=this._nodes.delete(node);
-	this._callbacks=this._callbacks.delete(node);}}
-
-
-
-	measureImpl(node){
-
-	return new MeasurementRecord();}
-
-
-	_measureNodes(){
-	var now=Date.now();
-
-	this._measurements=this._measurements.withMutations(_measurements => {
-	for(const node of this._nodes.keys()){
-	const measurement=this._measureNode(now,node);
-
-	_measurements.set(node,measurement);}});
-
-
-
-
-	for(const node of this._nodes.keys()){
-	const measurement=this._measurements.get(node);
-	this._callbacks.get(node).forEach(callback => callback(measurement));}
-
-
-
-	this._measurements=this._measurements.withMutations(_measurements => {
-	for(const [node,measurement] of _measurements.entries()){
-	if(measurement.expiration<now){
-	_measurements.delete(node);}}});
-
-
-
-
-	this._ids=this._ids.clear();
-	this._nodes=this._nodes.clear();
-	this._callbacks=this._callbacks.clear();
-	this._isRequesting=false;}
-
-
-	_measureNode(timestamp,node){
-	var measurement;
-	var data;
-
-	if(this._measurements.has(node)){
-	measurement=this._measurements.get(node);
-	if(measurement.expiration<timestamp){
-
-	data=this.measureImpl(node);
-	measurement=measurement.merge((0,_extends3.default)({},
-	data,{
-	expiration:timestamp+DURATION}));}}else 
-
-
-	{
-	data=this.measureImpl(node);
-	measurement=new MeasurementRecord((0,_extends3.default)({},
-	data,{
-	expiration:timestamp+DURATION,
-	id:'m_'+String(_id++)}));}
-
-
-	return measurement;}}
-
-
-
-	module.exports=BananaSlugAbstractNodeMeasurer;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _extends2 = __webpack_require__(13);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	const requestAnimationFrame = __webpack_require__(57);
+	const immutable = __webpack_require__(58);
+
+	// How long the measurement can be cached in ms.
+	const DURATION = 800;
+
+	const { Record, Map, Set } = immutable;
+
+	const MeasurementRecord = Record({
+	  bottom: 0,
+	  expiration: 0,
+	  height: 0,
+	  id: '',
+	  left: 0,
+	  right: 0,
+	  scrollX: 0,
+	  scrollY: 0,
+	  top: 0,
+	  width: 0
+	});
+
+	var _id = 100;
+
+	class BananaSlugAbstractNodeMeasurer {
+
+	  constructor() {
+	    // pending nodes to measure.
+	    this._nodes = new Map();
+
+	    // ids of pending nodes.
+	    this._ids = new Map();
+
+	    // cached measurements.
+	    this._measurements = new Map();
+
+	    // callbacks for pending nodes.
+	    this._callbacks = new Map();
+
+	    this._isRequesting = false;
+
+	    // non-auto-binds.
+	    this._measureNodes = this._measureNodes.bind(this);
+	  }
+
+	  request(node, callback) {
+	    var requestID = this._nodes.has(node) ? this._nodes.get(node) : String(_id++);
+
+	    this._nodes = this._nodes.set(node, requestID);
+	    this._ids = this._ids.set(requestID, node);
+
+	    var callbacks = this._callbacks.has(node) ? this._callbacks.get(node) : new Set();
+
+	    callbacks = callbacks.add(callback);
+	    this._callbacks = this._callbacks.set(node, callbacks);
+
+	    if (this._isRequesting) {
+	      return requestID;
+	    }
+
+	    this._isRequesting = true;
+	    requestAnimationFrame(this._measureNodes);
+	    return requestID;
+	  }
+
+	  cancel(requestID) {
+	    if (this._ids.has(requestID)) {
+	      var node = this._ids.get(requestID);
+	      this._ids = this._ids.delete(requestID);
+	      this._nodes = this._nodes.delete(node);
+	      this._callbacks = this._callbacks.delete(node);
+	    }
+	  }
+
+	  measureImpl(node) {
+	    // sub-class must overwrite this.
+	    return new MeasurementRecord();
+	  }
+
+	  _measureNodes() {
+	    var now = Date.now();
+
+	    this._measurements = this._measurements.withMutations(_measurements => {
+	      for (const node of this._nodes.keys()) {
+	        const measurement = this._measureNode(now, node);
+	        // cache measurement.
+	        _measurements.set(node, measurement);
+	      }
+	    });
+
+	    // execute callbacks.
+	    for (const node of this._nodes.keys()) {
+	      const measurement = this._measurements.get(node);
+	      this._callbacks.get(node).forEach(callback => callback(measurement));
+	    }
+
+	    // clear stale measurement.
+	    this._measurements = this._measurements.withMutations(_measurements => {
+	      for (const [node, measurement] of _measurements.entries()) {
+	        if (measurement.expiration < now) {
+	          _measurements.delete(node);
+	        }
+	      }
+	    });
+
+	    this._ids = this._ids.clear();
+	    this._nodes = this._nodes.clear();
+	    this._callbacks = this._callbacks.clear();
+	    this._isRequesting = false;
+	  }
+
+	  _measureNode(timestamp, node) {
+	    var measurement;
+	    var data;
+
+	    if (this._measurements.has(node)) {
+	      measurement = this._measurements.get(node);
+	      if (measurement.expiration < timestamp) {
+	        // measurement expires. measure again.
+	        data = this.measureImpl(node);
+	        measurement = measurement.merge((0, _extends3.default)({}, data, {
+	          expiration: timestamp + DURATION
+	        }));
+	      }
+	    } else {
+	      data = this.measureImpl(node);
+	      measurement = new MeasurementRecord((0, _extends3.default)({}, data, {
+	        expiration: timestamp + DURATION,
+	        id: 'm_' + String(_id++)
+	      }));
+	    }
+	    return measurement;
+	  }
+	}
+
+	module.exports = BananaSlugAbstractNodeMeasurer;
 
 /***/ },
 /* 42 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-	const immutable=__webpack_require__(58);
-	const requestAnimationFrame=__webpack_require__(57);
-
-
-
-
-
-
-	const DURATION=250;
-
-	const {Record,Map}=immutable;
-
-	const MetaData=Record({
-	expiration:0,
-	hit:0});
-
-
-	class BananaSlugAbstractNodePresenter{
-
-
-
-
-
-
-
-	constructor(){
-	this._pool=new Map();
-	this._drawing=false;
-	this._clearTimer=0;
-	this._enabled=false;
-
-	this._draw=this._draw.bind(this);
-	this._redraw=this._redraw.bind(this);}
-
-
-	present(measurement){
-	if(!this._enabled){
-	return;}
-
-	var data;
-	if(this._pool.has(measurement)){
-	data=this._pool.get(measurement);}else 
-	{
-	data=new MetaData();}
-
-
-	data=data.merge({
-	expiration:Date.now()+DURATION,
-	hit:data.hit+1});
-
-
-	this._pool=this._pool.set(measurement,data);
-
-	if(this._drawing){
-	return;}
-
-
-	this._drawing=true;
-	requestAnimationFrame(this._draw);}
-
-
-	setEnabled(enabled){
-
-	if(this._enabled===enabled){
-	return;}
-
-
-	this._enabled=enabled;
-
-	if(enabled){
-	return;}
-
-
-	if(this._clearTimer){
-	clearTimeout(this._clearTimer);
-	this._clearTimer=0;}
-
-
-	this._pool=this._pool.clear();
-	this._drawing=false;
-	this.clearImpl();}
-
-
-	drawImpl(measurements){}
-
-
-
-	clearImpl(){}
-
-
-
-	_redraw(){
-	this._clearTimer=0;
-	if(!this._drawing&&this._pool.size>0){
-	this._drawing=true;
-	this._draw();}}
-
-
-
-	_draw(){
-	if(!this._enabled){
-	this._drawing=false;
-	return;}
-
-
-	var now=Date.now();
-	var minExpiration=Number.MAX_VALUE;
-
-	this._pool=this._pool.withMutations(_pool => {
-	for(const [measurement,data] of _pool.entries()){
-	if(data.expiration<now){
-
-	_pool.delete(measurement);}else 
-	{
-	minExpiration=Math.min(data.expiration,minExpiration);}}});
-
-
-
-
-	this.drawImpl(this._pool);
-
-	if(this._pool.size>0){
-	clearTimeout(this._clearTimer);
-	this._clearTimer=setTimeout(this._redraw,minExpiration-now);}
-
-
-	this._drawing=false;}}
-
-
-
-	module.exports=BananaSlugAbstractNodePresenter;
+	const immutable = __webpack_require__(58);
+	const requestAnimationFrame = __webpack_require__(57);
+
+	// How long the measurement should be presented for.
+	const DURATION = 250;
+
+	const { Record, Map } = immutable;
+
+	const MetaData = Record({
+	  expiration: 0,
+	  hit: 0
+	});
+
+	class BananaSlugAbstractNodePresenter {
+
+	  constructor() {
+	    this._pool = new Map();
+	    this._drawing = false;
+	    this._clearTimer = 0;
+	    this._enabled = false;
+
+	    this._draw = this._draw.bind(this);
+	    this._redraw = this._redraw.bind(this);
+	  }
+
+	  present(measurement) {
+	    if (!this._enabled) {
+	      return;
+	    }
+	    var data;
+	    if (this._pool.has(measurement)) {
+	      data = this._pool.get(measurement);
+	    } else {
+	      data = new MetaData();
+	    }
+
+	    data = data.merge({
+	      expiration: Date.now() + DURATION,
+	      hit: data.hit + 1
+	    });
+
+	    this._pool = this._pool.set(measurement, data);
+
+	    if (this._drawing) {
+	      return;
+	    }
+
+	    this._drawing = true;
+	    requestAnimationFrame(this._draw);
+	  }
+
+	  setEnabled(enabled) {
+	    // console.log('setEnabled', enabled);
+	    if (this._enabled === enabled) {
+	      return;
+	    }
+
+	    this._enabled = enabled;
+
+	    if (enabled) {
+	      return;
+	    }
+
+	    if (this._clearTimer) {
+	      clearTimeout(this._clearTimer);
+	      this._clearTimer = 0;
+	    }
+
+	    this._pool = this._pool.clear();
+	    this._drawing = false;
+	    this.clearImpl();
+	  }
+
+	  drawImpl(measurements) {
+	    // sub-class should implement this.
+	  }
+
+	  clearImpl() {
+	    // sub-class should implement this.
+	  }
+
+	  _redraw() {
+	    this._clearTimer = 0;
+	    if (!this._drawing && this._pool.size > 0) {
+	      this._drawing = true;
+	      this._draw();
+	    }
+	  }
+
+	  _draw() {
+	    if (!this._enabled) {
+	      this._drawing = false;
+	      return;
+	    }
+
+	    var now = Date.now();
+	    var minExpiration = Number.MAX_VALUE;
+
+	    this._pool = this._pool.withMutations(_pool => {
+	      for (const [measurement, data] of _pool.entries()) {
+	        if (data.expiration < now) {
+	          // already passed the expiration time.
+	          _pool.delete(measurement);
+	        } else {
+	          minExpiration = Math.min(data.expiration, minExpiration);
+	        }
+	      }
+	    });
+
+	    this.drawImpl(this._pool);
+
+	    if (this._pool.size > 0) {
+	      clearTimeout(this._clearTimer);
+	      this._clearTimer = setTimeout(this._redraw, minExpiration - now);
+	    }
+
+	    this._drawing = false;
+	  }
+	}
+
+	module.exports = BananaSlugAbstractNodePresenter;
 
 /***/ },
 /* 43 */
@@ -7018,2286 +7007,2165 @@
 /* 59 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _set=__webpack_require__(80);var _set2=_interopRequireDefault(_set);var _weakMap=__webpack_require__(81);var _weakMap2=_interopRequireDefault(_weakMap);var _map=__webpack_require__(20);var _map2=_interopRequireDefault(_map);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var {EventEmitter}=__webpack_require__(56);
-
-	var assign=__webpack_require__(38);
-	var guid=__webpack_require__(77);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Agent extends EventEmitter{
-
-
-
-
-
-
-
-
-
-
-
-	constructor(global,capabilities){
-	super();
-	this.global=global;
-	this.reactElements=new _map2.default();
-	this.ids=new _weakMap2.default();
-	this.renderers=new _map2.default();
-	this.elementData=new _map2.default();
-	this.roots=new _set2.default();
-	this.reactInternals={};
-	this.on('selected',id => {
-	var data=this.elementData.get(id);
-	if(data&&data.publicInstance){
-	this.global.$r=data.publicInstance;}});
-
-
-	this._prevSelected=null;
-	var isReactDOM=window.document&&typeof window.document.createElement==='function';
-	this.capabilities=assign({
-	scroll:isReactDOM&&typeof window.document.body.scrollIntoView==='function',
-	dom:isReactDOM,
-	editTextContent:false},
-	capabilities);}
-
-
-
-	sub(ev,fn){
-	this.on(ev,fn);
-	return () => {
-	this.removeListener(ev,fn);};}
-
-
-
-	setReactInternals(renderer,reactInternals){
-	this.reactInternals[renderer]=reactInternals;}
-
-
-	addBridge(bridge){
-
-
-	bridge.on('requestCapabilities',() => {
-	bridge.send('capabilities',this.capabilities);
-	this.emit('connected');});
-
-	bridge.on('setState',this._setState.bind(this));
-	bridge.on('setProps',this._setProps.bind(this));
-	bridge.on('setContext',this._setContext.bind(this));
-	bridge.on('makeGlobal',this._makeGlobal.bind(this));
-	bridge.on('highlight',id => this.highlight(id));
-	bridge.on('highlightMany',id => this.highlightMany(id));
-	bridge.on('hideHighlight',() => this.emit('hideHighlight'));
-	bridge.on('startInspecting',() => this.emit('startInspecting'));
-	bridge.on('stopInspecting',() => this.emit('stopInspecting'));
-	bridge.on('selected',id => this.emit('selected',id));
-	bridge.on('shutdown',() => this.emit('shutdown'));
-	bridge.on('changeTextContent',({id,text}) => {
-	var node=this.getNodeForID(id);
-	if(!node){
-	return;}
-
-	node.textContent=text;});
-
-
-	bridge.on('putSelectedNode',id => {
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node=this.getNodeForID(id);});
-
-
-	bridge.on('putSelectedInstance',id => {
-	var node=this.elementData.get(id);
-	if(node&&node.publicInstance){
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst=node.publicInstance;}else 
-	{
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst=null;}});
-
-
-
-	bridge.on('checkSelection',() => {
-	var newSelected=window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$0;
-	if(newSelected!==this._prevSelected){
-	this._prevSelected=newSelected;
-	var sentSelected=window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node;
-	if(newSelected!==sentSelected){
-	this.selectFromDOMNode(newSelected,true);}}});
-
-
-
-	bridge.on('scrollToNode',id => this.scrollToNode(id));
-	bridge.on('bananaslugchange',value => this.emit('bananaslugchange',value));
-
-
-	this.on('root',id => bridge.send('root',id));
-	this.on('mount',data => bridge.send('mount',data));
-	this.on('update',data => bridge.send('update',data));
-	this.on('unmount',id => {
-	bridge.send('unmount',id);
-
-
-	bridge.forget(id);});
-
-	this.on('setSelection',data => bridge.send('select',data));}
-
-
-	scrollToNode(id){
-	var node=this.getNodeForID(id);
-	if(!node){
-
-	return;}
-
-	if(node.scrollIntoViewIfNeeded){
-	node.scrollIntoViewIfNeeded();}else 
-	{
-	node.scrollIntoView();}
-
-	this.highlight(id);}
-
-
-	highlight(id){
-	var data=this.elementData.get(id);
-	var node=this.getNodeForID(id);
-	if(data&&node){
-	this.emit('highlight',{node,name:data.name,props:data.props});}}
-
-
-
-	highlightMany(ids){
-	var nodes=[];
-	ids.forEach(id => {
-	var node=this.getNodeForID(id);
-	if(node){
-	nodes.push(node);}});
-
-
-	if(nodes.length){
-	this.emit('highlightMany',nodes);}}
-
-
-
-	getNodeForID(id){
-	var component=this.reactElements.get(id);
-	if(!component){
-	return null;}
-
-	var renderer=this.renderers.get(id);
-	if(renderer&&this.reactInternals[renderer].getNativeFromReactElement){
-	return this.reactInternals[renderer].getNativeFromReactElement(component);}}
-
-
-
-	selectFromDOMNode(node,quiet){
-	var id=this.getIDForNode(node);
-	if(!id){
-	return;}
-
-	this.emit('setSelection',{id,quiet});}
-
-
-	selectFromReactInstance(instance,quiet){
-	var id=this.getId(instance);
-	if(!id){
-
-	return;}
-
-	this.emit('setSelection',{id,quiet});}
-
-
-	getIDForNode(node){
-	if(!this.reactInternals){
-	return null;}
-
-	var component;
-	for(var renderer in this.reactInternals){
-
-	try{
-
-	component=this.reactInternals[renderer].getReactElementFromNative(node);}
-	catch(e){}
-	if(component){
-	return this.getId(component);}}}
-
-
-
-
-	_setProps({id,path,value}){
-	var data=this.elementData.get(id);
-	if(data&&data.updater&&data.updater.setInProps){
-	data.updater.setInProps(path,value);}else 
-	{}}
-
-
-
-
-	_setState({id,path,value}){
-	var data=this.elementData.get(id);
-	if(data&&data.updater&&data.updater.setInState){
-	data.updater.setInState(path,value);}else 
-	{}}
-
-
-
-
-	_setContext({id,path,value}){
-	var data=this.elementData.get(id);
-	if(data&&data.updater&&data.updater.setInContext){
-	data.updater.setInContext(path,value);}else 
-	{}}
-
-
-
-
-	_makeGlobal({id,path}){
-	var data=this.elementData.get(id);
-	if(!data){
-	return;}
-
-	var value;
-	if(path==='instance'){
-	value=data.publicInstance;}else 
-	{
-	value=getIn(data,path);}
-
-	this.global.$tmp=value;}
-
-
-
-	getId(element){
-	if(typeof element!=='object'){
-	return element;}
-
-	if(!this.ids.has(element)){
-	this.ids.set(element,guid());
-	this.reactElements.set(this.ids.get(element),element);}
-
-	return this.ids.get(element);}
-
-
-	addRoot(renderer,element){
-	var id=this.getId(element);
-	this.roots.add(id);
-	this.emit('root',id);}
-
-
-	onMounted(renderer,component,data){
-	var id=this.getId(component);
-	this.renderers.set(id,renderer);
-	this.elementData.set(id,data);
-
-	var send=assign({},data);
-	if(send.children&&send.children.map){
-	send.children=send.children.map(c => this.getId(c));}
-
-	send.id=id;
-	send.canUpdate=send.updater&&!!send.updater.forceUpdate;
-	delete send.type;
-	delete send.updater;
-	this.emit('mount',send);}
-
-
-	onUpdated(component,data){
-	var id=this.getId(component);
-	this.elementData.set(id,data);
-
-	var send=assign({},data);
-	if(send.children&&send.children.map){
-	send.children=send.children.map(c => this.getId(c));}
-
-	send.id=id;
-	send.canUpdate=send.updater&&!!send.updater.forceUpdate;
-	delete send.type;
-	delete send.updater;
-	this.emit('update',send);}
-
-
-	onUnmounted(component){
-	var id=this.getId(component);
-	this.elementData.delete(id);
-	this.roots.delete(id);
-	this.renderers.delete(id);
-	this.emit('unmount',id);
-	this.ids.delete(component);}}
-
-
-
-	function getIn(base,path){
-	return path.reduce((obj,attr) => {
-	return obj?obj[attr]:null;},
-	base);}
-
-
-	module.exports=Agent;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _set = __webpack_require__(80);
+
+	var _set2 = _interopRequireDefault(_set);
+
+	var _weakMap = __webpack_require__(81);
+
+	var _weakMap2 = _interopRequireDefault(_weakMap);
+
+	var _map = __webpack_require__(20);
+
+	var _map2 = _interopRequireDefault(_map);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var { EventEmitter } = __webpack_require__(56);
+
+	var assign = __webpack_require__(38);
+	var guid = __webpack_require__(77);
+
+	/**
+	 * The agent lives on the page in the same context as React, observes events
+	 * from the `backend`, and communicates (via a `Bridge`) with the frontend.
+	 *
+	 * It is responsible for generating string IDs (ElementID) for each react
+	 * element, maintaining a mapping of those IDs to elements, handling messages
+	 * from the frontend, and translating between react elements and native
+	 * handles.
+	 *
+	 *
+	 *   React
+	 *     |
+	 *     v
+	 *  backend
+	 *     |
+	 *     v
+	 *  -----------
+	 * | **Agent** |
+	 *  -----------
+	 *     ^
+	 *     |
+	 *     v
+	 *  (Bridge)
+	 *     ^
+	 *     |
+	 * serialization
+	 *     |
+	 *     v
+	 *  (Bridge)
+	 *     ^
+	 *     |
+	 *     v
+	 *  ----------------
+	 * | Frontend Store |
+	 *  ----------------
+	 *
+	 *
+	 * Events from the `backend`:
+	 * - root (got a root)
+	 * - mount (a component mounted)
+	 * - update (a component updated)
+	 * - unmount (a component mounted)
+	 *
+	 * Events from the `frontend` Store:
+	 * - see `addBridge` for subscriptions
+	 *
+	 * Events that Agent fires:
+	 * - selected
+	 * - hideHighlight
+	 * - startInspecting
+	 * - stopInspecting
+	 * - shutdown
+	 * - highlight /highlightMany
+	 * - setSelection
+	 * - root
+	 * - mount
+	 * - update
+	 * - unmount
+	 */
+	class Agent extends EventEmitter {
+
+	  constructor(global, capabilities) {
+	    super();
+	    this.global = global;
+	    this.reactElements = new _map2.default();
+	    this.ids = new _weakMap2.default();
+	    this.renderers = new _map2.default();
+	    this.elementData = new _map2.default();
+	    this.roots = new _set2.default();
+	    this.reactInternals = {};
+	    this.on('selected', id => {
+	      var data = this.elementData.get(id);
+	      if (data && data.publicInstance) {
+	        this.global.$r = data.publicInstance;
+	      }
+	    });
+	    this._prevSelected = null;
+	    var isReactDOM = window.document && typeof window.document.createElement === 'function';
+	    this.capabilities = assign({
+	      scroll: isReactDOM && typeof window.document.body.scrollIntoView === 'function',
+	      dom: isReactDOM,
+	      editTextContent: false
+	    }, capabilities);
+	  }
+
+	  // returns an "unsubscribe" function
+
+	  // the window or global -> used to "make a value available in the console"
+	  sub(ev, fn) {
+	    this.on(ev, fn);
+	    return () => {
+	      this.removeListener(ev, fn);
+	    };
+	  }
+
+	  setReactInternals(renderer, reactInternals) {
+	    this.reactInternals[renderer] = reactInternals;
+	  }
+
+	  addBridge(bridge) {
+	    /** Events received from the frontend **/
+	    // the initial handshake
+	    bridge.on('requestCapabilities', () => {
+	      bridge.send('capabilities', this.capabilities);
+	      this.emit('connected');
+	    });
+	    bridge.on('setState', this._setState.bind(this));
+	    bridge.on('setProps', this._setProps.bind(this));
+	    bridge.on('setContext', this._setContext.bind(this));
+	    bridge.on('makeGlobal', this._makeGlobal.bind(this));
+	    bridge.on('highlight', id => this.highlight(id));
+	    bridge.on('highlightMany', id => this.highlightMany(id));
+	    bridge.on('hideHighlight', () => this.emit('hideHighlight'));
+	    bridge.on('startInspecting', () => this.emit('startInspecting'));
+	    bridge.on('stopInspecting', () => this.emit('stopInspecting'));
+	    bridge.on('selected', id => this.emit('selected', id));
+	    bridge.on('shutdown', () => this.emit('shutdown'));
+	    bridge.on('changeTextContent', ({ id, text }) => {
+	      var node = this.getNodeForID(id);
+	      if (!node) {
+	        return;
+	      }
+	      node.textContent = text;
+	    });
+	    // used to "inspect node in Elements pane"
+	    bridge.on('putSelectedNode', id => {
+	      window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node = this.getNodeForID(id);
+	    });
+	    // used to "view source in Sources pane"
+	    bridge.on('putSelectedInstance', id => {
+	      var node = this.elementData.get(id);
+	      if (node && node.publicInstance) {
+	        window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst = node.publicInstance;
+	      } else {
+	        window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst = null;
+	      }
+	    });
+	    // used to select the inspected node ($0)
+	    bridge.on('checkSelection', () => {
+	      var newSelected = window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$0;
+	      if (newSelected !== this._prevSelected) {
+	        this._prevSelected = newSelected;
+	        var sentSelected = window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node;
+	        if (newSelected !== sentSelected) {
+	          this.selectFromDOMNode(newSelected, true);
+	        }
+	      }
+	    });
+	    bridge.on('scrollToNode', id => this.scrollToNode(id));
+	    bridge.on('bananaslugchange', value => this.emit('bananaslugchange', value));
+
+	    /** Events sent to the frontend **/
+	    this.on('root', id => bridge.send('root', id));
+	    this.on('mount', data => bridge.send('mount', data));
+	    this.on('update', data => bridge.send('update', data));
+	    this.on('unmount', id => {
+	      bridge.send('unmount', id);
+	      // once an element has been unmounted, the bridge doesn't need to be
+	      // able to inspect it anymore.
+	      bridge.forget(id);
+	    });
+	    this.on('setSelection', data => bridge.send('select', data));
+	  }
+
+	  scrollToNode(id) {
+	    var node = this.getNodeForID(id);
+	    if (!node) {
+	      return;
+	    }
+	    if (node.scrollIntoViewIfNeeded) {
+	      node.scrollIntoViewIfNeeded();
+	    } else {
+	      node.scrollIntoView();
+	    }
+	    this.highlight(id);
+	  }
+
+	  highlight(id) {
+	    var data = this.elementData.get(id);
+	    var node = this.getNodeForID(id);
+	    if (data && node) {
+	      this.emit('highlight', { node, name: data.name, props: data.props });
+	    }
+	  }
+
+	  highlightMany(ids) {
+	    var nodes = [];
+	    ids.forEach(id => {
+	      var node = this.getNodeForID(id);
+	      if (node) {
+	        nodes.push(node);
+	      }
+	    });
+	    if (nodes.length) {
+	      this.emit('highlightMany', nodes);
+	    }
+	  }
+
+	  getNodeForID(id) {
+	    var component = this.reactElements.get(id);
+	    if (!component) {
+	      return null;
+	    }
+	    var renderer = this.renderers.get(id);
+	    if (renderer && this.reactInternals[renderer].getNativeFromReactElement) {
+	      return this.reactInternals[renderer].getNativeFromReactElement(component);
+	    }
+	  }
+
+	  selectFromDOMNode(node, quiet) {
+	    var id = this.getIDForNode(node);
+	    if (!id) {
+	      return;
+	    }
+	    this.emit('setSelection', { id, quiet });
+	  }
+
+	  selectFromReactInstance(instance, quiet) {
+	    var id = this.getId(instance);
+	    if (!id) {
+	      return;
+	    }
+	    this.emit('setSelection', { id, quiet });
+	  }
+
+	  getIDForNode(node) {
+	    if (!this.reactInternals) {
+	      return null;
+	    }
+	    var component;
+	    for (var renderer in this.reactInternals) {
+	      // If a renderer doesn't know about a reactId, it will throw an error.
+	      try {
+	        // $FlowFixMe possibly null - it's not null
+	        component = this.reactInternals[renderer].getReactElementFromNative(node);
+	      } catch (e) {}
+	      if (component) {
+	        return this.getId(component);
+	      }
+	    }
+	  }
+
+	  _setProps({ id, path, value }) {
+	    var data = this.elementData.get(id);
+	    if (data && data.updater && data.updater.setInProps) {
+	      data.updater.setInProps(path, value);
+	    } else {}
+	  }
+
+	  _setState({ id, path, value }) {
+	    var data = this.elementData.get(id);
+	    if (data && data.updater && data.updater.setInState) {
+	      data.updater.setInState(path, value);
+	    } else {}
+	  }
+
+	  _setContext({ id, path, value }) {
+	    var data = this.elementData.get(id);
+	    if (data && data.updater && data.updater.setInContext) {
+	      data.updater.setInContext(path, value);
+	    } else {}
+	  }
+
+	  _makeGlobal({ id, path }) {
+	    var data = this.elementData.get(id);
+	    if (!data) {
+	      return;
+	    }
+	    var value;
+	    if (path === 'instance') {
+	      value = data.publicInstance;
+	    } else {
+	      value = getIn(data, path);
+	    }
+	    this.global.$tmp = value;
+	  }
+
+	  getId(element) {
+	    if (typeof element !== 'object') {
+	      return element;
+	    }
+	    if (!this.ids.has(element)) {
+	      this.ids.set(element, guid());
+	      this.reactElements.set(this.ids.get(element), element);
+	    }
+	    return this.ids.get(element);
+	  }
+
+	  addRoot(renderer, element) {
+	    var id = this.getId(element);
+	    this.roots.add(id);
+	    this.emit('root', id);
+	  }
+
+	  onMounted(renderer, component, data) {
+	    var id = this.getId(component);
+	    this.renderers.set(id, renderer);
+	    this.elementData.set(id, data);
+
+	    var send = assign({}, data);
+	    if (send.children && send.children.map) {
+	      send.children = send.children.map(c => this.getId(c));
+	    }
+	    send.id = id;
+	    send.canUpdate = send.updater && !!send.updater.forceUpdate;
+	    delete send.type;
+	    delete send.updater;
+	    this.emit('mount', send);
+	  }
+
+	  onUpdated(component, data) {
+	    var id = this.getId(component);
+	    this.elementData.set(id, data);
+
+	    var send = assign({}, data);
+	    if (send.children && send.children.map) {
+	      send.children = send.children.map(c => this.getId(c));
+	    }
+	    send.id = id;
+	    send.canUpdate = send.updater && !!send.updater.forceUpdate;
+	    delete send.type;
+	    delete send.updater;
+	    this.emit('update', send);
+	  }
+
+	  onUnmounted(component) {
+	    var id = this.getId(component);
+	    this.elementData.delete(id);
+	    this.roots.delete(id);
+	    this.renderers.delete(id);
+	    this.emit('unmount', id);
+	    this.ids.delete(component);
+	  }
+	}
+
+	function getIn(base, path) {
+	  return path.reduce((obj, attr) => {
+	    return obj ? obj[attr] : null;
+	  }, base);
+	}
+
+	module.exports = Agent;
 
 /***/ },
 /* 60 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _getOwnPropertyNames=__webpack_require__(79);var _getOwnPropertyNames2=_interopRequireDefault(_getOwnPropertyNames);var _extends2=__webpack_require__(13);var _extends3=_interopRequireDefault(_extends2);var _map=__webpack_require__(20);var _map2=_interopRequireDefault(_map);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var consts=__webpack_require__(39);
-	var hydrate=__webpack_require__(62);
-	var dehydrate=__webpack_require__(61);
-	var performanceNow=__webpack_require__(144);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Bridge{
-
-
-
-
-
-
-
-
-
-
-
-	constructor(wall){
-	this._cbs=new _map2.default();
-	this._inspectables=new _map2.default();
-	this._cid=0;
-	this._listeners={};
-	this._buffer=[];
-	this._waiting=null;
-	this._lastTime=5;
-	this._callers={};
-	this._paused=false;
-	this._wall=wall;
-
-	wall.listen(this._handleMessage.bind(this));}
-
-
-	inspect(id,path,cb){
-	var _cid=this._cid++;
-	this._cbs.set(_cid,(data,cleaned,proto,protoclean) => {
-	if(cleaned.length){
-	hydrate(data,cleaned);}
-
-	if(proto&&protoclean.length){
-	hydrate(proto,protoclean);}
-
-	if(proto){
-	data[consts.proto]=proto;}
-
-	cb(data);});
-
-
-	this._wall.send({
-	type:'inspect',
-	callback:_cid,
-	path,
-	id});}
-
-
-
-	call(name,args,cb){
-	var _cid=this._cid++;
-	this._cbs.set(_cid,cb);
-
-	this._wall.send({
-	type:'call',
-	callback:_cid,
-	args,
-	name});}
-
-
-
-	onCall(name,handler){
-	if(this._callers[name]){
-	throw new Error('only one call handler per call name allowed');}
-
-	this._callers[name]=handler;}
-
-
-	pause(){
-	this._wall.send({
-	type:'pause'});}
-
-
-
-	resume(){
-	this._wall.send({
-	type:'resume'});}
-
-
-
-	setInspectable(id,data){
-	var prev=this._inspectables.get(id);
-	if(!prev){
-	this._inspectables.set(id,data);
-	return;}
-
-	this._inspectables.set(id,(0,_extends3.default)({},prev,data));}
-
-
-	sendOne(evt,data){
-	var cleaned=[];
-	var san=dehydrate(data,cleaned);
-	if(cleaned.length){
-	this.setInspectable(data.id,data);}
-
-	this._wall.send({type:'event',evt,data:san,cleaned});}
-
-
-	send(evt,data){
-	if(!this._waiting&&!this._paused){
-	this._buffer=[];
-	var nextTime=this._lastTime*3;
-	if(nextTime>500){
-
-	nextTime=500;}
-
-	this._waiting=setTimeout(() => {
-	this.flush();
-	this._waiting=null;},
-	nextTime);}
-
-	this._buffer.push({evt,data});}
-
-
-	flush(){
-	var start=performanceNow();
-	var events=this._buffer.map(({evt,data}) => {
-	var cleaned=[];
-	var san=dehydrate(data,cleaned);
-	if(cleaned.length){
-	this.setInspectable(data.id,data);}
-
-	return {type:'event',evt,data:san,cleaned};});
-
-	this._wall.send({type:'many-events',events});
-	this._buffer=[];
-	this._waiting=null;
-	this._lastTime=performanceNow()-start;}
-
-
-	forget(id){
-	this._inspectables.delete(id);}
-
-
-	on(evt,fn){
-	if(!this._listeners[evt]){
-	this._listeners[evt]=[fn];}else 
-	{
-	this._listeners[evt].push(fn);}}
-
-
-
-	off(evt,fn){
-	if(!this._listeners[evt]){
-	return;}
-
-	var ix=this._listeners[evt].indexOf(fn);
-	if(ix!==-1){
-	this._listeners[evt].splice(ix,1);}}
-
-
-
-	once(evt,fn){
-	var self=this;
-	var listener=function listener(){
-	fn.apply(this,arguments);
-	self.off(evt,listener);};
-
-	this.on(evt,listener);}
-
-
-	_handleMessage(payload){
-	if(payload.type==='resume'){
-	this._paused=false;
-	this._waiting=null;
-	this.flush();
-	return;}
-
-
-	if(payload.type==='pause'){
-	this._paused=true;
-	clearTimeout(this._waiting);
-	this._waiting=null;
-	return;}
-
-
-	if(payload.type==='callback'){
-	var callback=this._cbs.get(payload.id);
-	if(callback){
-	callback(...payload.args);
-	this._cbs.delete(payload.id);}
-
-	return;}
-
-
-	if(payload.type==='call'){
-	this._handleCall(payload.name,payload.args,payload.callback);
-	return;}
-
-
-	if(payload.type==='inspect'){
-	this._inspectResponse(payload.id,payload.path,payload.callback);
-	return;}
-
-
-	if(payload.type==='event'){
-
-	if(payload.cleaned){
-	hydrate(payload.data,payload.cleaned);}
-
-	var fns=this._listeners[payload.evt];
-	var data=payload.data;
-	if(fns){
-	fns.forEach(fn => fn(data));}}
-
-
-
-	if(payload.type==='many-events'){
-	payload.events.forEach(event => {
-
-	if(event.cleaned){
-	hydrate(event.data,event.cleaned);}
-
-	var handlers=this._listeners[event.evt];
-	if(handlers){
-	handlers.forEach(fn => fn(event.data));}});}}
-
-
-
-
-
-	_handleCall(name,args,callback){
-	if(!this._callers[name]){
-	return;}
-
-	args=!Array.isArray(args)?[args]:args;
-	var result;
-	try{
-	result=this._callers[name].apply(null,args);}
-	catch(e){
-
-	return undefined;}
-
-	this._wall.send({
-	type:'callback',
-	id:callback,
-	args:[result]});}
-
-
-
-	_inspectResponse(id,path,callback){
-	var inspectable=this._inspectables.get(id);
-
-	var result={};
-	var cleaned=[];
-	var proto=null;
-	var protoclean=[];
-	if(inspectable){
-	var val=getIn(inspectable,path);
-	var protod=false;
-	var isFn=typeof val==='function';
-	(0,_getOwnPropertyNames2.default)(val).forEach(name => {
-	if(name==='__proto__'){
-	protod=true;}
-
-	if(isFn&&(name==='arguments'||name==='callee'||name==='caller')){
-	return;}
-
-	result[name]=dehydrate(val[name],cleaned,[name]);});
-
-
-
-	if(!protod&&val.__proto__&&val.constructor.name!=='Object'){
-	var newProto={};
-	var pIsFn=typeof val.__proto__==='function';
-	(0,_getOwnPropertyNames2.default)(val.__proto__).forEach(name => {
-	if(pIsFn&&(name==='arguments'||name==='callee'||name==='caller')){
-	return;}
-
-	newProto[name]=dehydrate(val.__proto__[name],protoclean,[name]);});
-
-	proto=newProto;}}
-
-
-
-
-	this._wall.send({
-	type:'callback',
-	id:callback,
-	args:[result,cleaned,proto,protoclean]});}}
-
-
-
-
-	function getIn(base,path){
-	return path.reduce((obj,attr) => {
-	return obj?obj[attr]:null;},
-	base);}
-
-
-	module.exports=Bridge;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _getOwnPropertyNames = __webpack_require__(79);
+
+	var _getOwnPropertyNames2 = _interopRequireDefault(_getOwnPropertyNames);
+
+	var _extends2 = __webpack_require__(13);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	var _map = __webpack_require__(20);
+
+	var _map2 = _interopRequireDefault(_map);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var consts = __webpack_require__(39);
+	var hydrate = __webpack_require__(62);
+	var dehydrate = __webpack_require__(61);
+	var performanceNow = __webpack_require__(144);
+
+	/**
+	 * The bridge is responsible for serializing requests between the Agent and
+	 * the Frontend Store. It needs to be connected to a Wall object that can send
+	 * JSONable data to the bridge on the other side.
+	 *
+	 * complex data
+	 *     |
+	 *     v
+	 *  [Bridge]
+	 *     |
+	 * jsonable data
+	 *     |
+	 *     v
+	 *   [wall]
+	 *     |
+	 *     v
+	 * ~ some barrier ~
+	 *     |
+	 *     v
+	 *   [wall]
+	 *     |
+	 *     v
+	 *  [Bridge]
+	 *     |
+	 *     v
+	 * "hydrated" data
+	 *
+	 * When an item is passed in that can't be serialized (anything other than a
+	 * plain array, object, or literal value), the object is "cleaned", and
+	 * rehydrated on the other side with `Symbol` attributes indicating that the
+	 * object needs to be inspected for more detail.
+	 *
+	 * Example:
+	 *
+	 * bridge.send('evname', {id: 'someid', foo: MyCoolObjectInstance})
+	 * ->
+	 * shows up, hydrated as
+	 * {
+	 *   id: 'someid',
+	 *   foo: {
+	 *     [consts.name]: 'MyCoolObjectInstance',
+	 *     [consts.type]: 'object',
+	 *     [consts.meta]: {},
+	 *     [consts.inspected]: false,
+	 *   }
+	 * }
+	 *
+	 * The `consts` variables are Symbols, and as such are non-ennumerable.
+	 * The front-end therefore needs to check for `consts.inspected` on received
+	 * objects, and can thereby display object proxies and inspect them.
+	 *
+	 * Complex objects that are passed are expected to have a top-level `id`
+	 * attribute, which is used for later lookup + inspection. Once it has been
+	 * determined that an object is no longer needed, call `.forget(id)` to clean
+	 * up.
+	 */
+	class Bridge {
+
+	  constructor(wall) {
+	    this._cbs = new _map2.default();
+	    this._inspectables = new _map2.default();
+	    this._cid = 0;
+	    this._listeners = {};
+	    this._buffer = [];
+	    this._waiting = null;
+	    this._lastTime = 5;
+	    this._callers = {};
+	    this._paused = false;
+	    this._wall = wall;
+
+	    wall.listen(this._handleMessage.bind(this));
+	  }
+
+	  inspect(id, path, cb) {
+	    var _cid = this._cid++;
+	    this._cbs.set(_cid, (data, cleaned, proto, protoclean) => {
+	      if (cleaned.length) {
+	        hydrate(data, cleaned);
+	      }
+	      if (proto && protoclean.length) {
+	        hydrate(proto, protoclean);
+	      }
+	      if (proto) {
+	        data[consts.proto] = proto;
+	      }
+	      cb(data);
+	    });
+
+	    this._wall.send({
+	      type: 'inspect',
+	      callback: _cid,
+	      path,
+	      id
+	    });
+	  }
+
+	  call(name, args, cb) {
+	    var _cid = this._cid++;
+	    this._cbs.set(_cid, cb);
+
+	    this._wall.send({
+	      type: 'call',
+	      callback: _cid,
+	      args,
+	      name
+	    });
+	  }
+
+	  onCall(name, handler) {
+	    if (this._callers[name]) {
+	      throw new Error('only one call handler per call name allowed');
+	    }
+	    this._callers[name] = handler;
+	  }
+
+	  pause() {
+	    this._wall.send({
+	      type: 'pause'
+	    });
+	  }
+
+	  resume() {
+	    this._wall.send({
+	      type: 'resume'
+	    });
+	  }
+
+	  setInspectable(id, data) {
+	    var prev = this._inspectables.get(id);
+	    if (!prev) {
+	      this._inspectables.set(id, data);
+	      return;
+	    }
+	    this._inspectables.set(id, (0, _extends3.default)({}, prev, data));
+	  }
+
+	  sendOne(evt, data) {
+	    var cleaned = [];
+	    var san = dehydrate(data, cleaned);
+	    if (cleaned.length) {
+	      this.setInspectable(data.id, data);
+	    }
+	    this._wall.send({ type: 'event', evt, data: san, cleaned });
+	  }
+
+	  send(evt, data) {
+	    if (!this._waiting && !this._paused) {
+	      this._buffer = [];
+	      var nextTime = this._lastTime * 3;
+	      if (nextTime > 500) {
+	        // flush is taking an unexpected amount of time
+	        nextTime = 500;
+	      }
+	      this._waiting = setTimeout(() => {
+	        this.flush();
+	        this._waiting = null;
+	      }, nextTime);
+	    }
+	    this._buffer.push({ evt, data });
+	  }
+
+	  flush() {
+	    var start = performanceNow();
+	    var events = this._buffer.map(({ evt, data }) => {
+	      var cleaned = [];
+	      var san = dehydrate(data, cleaned);
+	      if (cleaned.length) {
+	        this.setInspectable(data.id, data);
+	      }
+	      return { type: 'event', evt, data: san, cleaned };
+	    });
+	    this._wall.send({ type: 'many-events', events });
+	    this._buffer = [];
+	    this._waiting = null;
+	    this._lastTime = performanceNow() - start;
+	  }
+
+	  forget(id) {
+	    this._inspectables.delete(id);
+	  }
+
+	  on(evt, fn) {
+	    if (!this._listeners[evt]) {
+	      this._listeners[evt] = [fn];
+	    } else {
+	      this._listeners[evt].push(fn);
+	    }
+	  }
+
+	  off(evt, fn) {
+	    if (!this._listeners[evt]) {
+	      return;
+	    }
+	    var ix = this._listeners[evt].indexOf(fn);
+	    if (ix !== -1) {
+	      this._listeners[evt].splice(ix, 1);
+	    }
+	  }
+
+	  once(evt, fn) {
+	    var self = this;
+	    var listener = function listener() {
+	      fn.apply(this, arguments);
+	      self.off(evt, listener);
+	    };
+	    this.on(evt, listener);
+	  }
+
+	  _handleMessage(payload) {
+	    if (payload.type === 'resume') {
+	      this._paused = false;
+	      this._waiting = null;
+	      this.flush();
+	      return;
+	    }
+
+	    if (payload.type === 'pause') {
+	      this._paused = true;
+	      clearTimeout(this._waiting);
+	      this._waiting = null;
+	      return;
+	    }
+
+	    if (payload.type === 'callback') {
+	      var callback = this._cbs.get(payload.id);
+	      if (callback) {
+	        callback(...payload.args);
+	        this._cbs.delete(payload.id);
+	      }
+	      return;
+	    }
+
+	    if (payload.type === 'call') {
+	      this._handleCall(payload.name, payload.args, payload.callback);
+	      return;
+	    }
+
+	    if (payload.type === 'inspect') {
+	      this._inspectResponse(payload.id, payload.path, payload.callback);
+	      return;
+	    }
+
+	    if (payload.type === 'event') {
+	      // console.log('[bridge<-]', payload.evt);
+	      if (payload.cleaned) {
+	        hydrate(payload.data, payload.cleaned);
+	      }
+	      var fns = this._listeners[payload.evt];
+	      var data = payload.data;
+	      if (fns) {
+	        fns.forEach(fn => fn(data));
+	      }
+	    }
+
+	    if (payload.type === 'many-events') {
+	      payload.events.forEach(event => {
+	        // console.log('[bridge<-]', payload.evt);
+	        if (event.cleaned) {
+	          hydrate(event.data, event.cleaned);
+	        }
+	        var handlers = this._listeners[event.evt];
+	        if (handlers) {
+	          handlers.forEach(fn => fn(event.data));
+	        }
+	      });
+	    }
+	  }
+
+	  _handleCall(name, args, callback) {
+	    if (!this._callers[name]) {
+	      return;
+	    }
+	    args = !Array.isArray(args) ? [args] : args;
+	    var result;
+	    try {
+	      result = this._callers[name].apply(null, args);
+	    } catch (e) {
+	      return undefined;
+	    }
+	    this._wall.send({
+	      type: 'callback',
+	      id: callback,
+	      args: [result]
+	    });
+	  }
+
+	  _inspectResponse(id, path, callback) {
+	    var inspectable = this._inspectables.get(id);
+
+	    var result = {};
+	    var cleaned = [];
+	    var proto = null;
+	    var protoclean = [];
+	    if (inspectable) {
+	      var val = getIn(inspectable, path);
+	      var protod = false;
+	      var isFn = typeof val === 'function';
+	      (0, _getOwnPropertyNames2.default)(val).forEach(name => {
+	        if (name === '__proto__') {
+	          protod = true;
+	        }
+	        if (isFn && (name === 'arguments' || name === 'callee' || name === 'caller')) {
+	          return;
+	        }
+	        result[name] = dehydrate(val[name], cleaned, [name]);
+	      });
+
+	      /* eslint-disable no-proto */
+	      if (!protod && val.__proto__ && val.constructor.name !== 'Object') {
+	        var newProto = {};
+	        var pIsFn = typeof val.__proto__ === 'function';
+	        (0, _getOwnPropertyNames2.default)(val.__proto__).forEach(name => {
+	          if (pIsFn && (name === 'arguments' || name === 'callee' || name === 'caller')) {
+	            return;
+	          }
+	          newProto[name] = dehydrate(val.__proto__[name], protoclean, [name]);
+	        });
+	        proto = newProto;
+	      }
+	      /* eslint-enable no-proto */
+	    }
+
+	    this._wall.send({
+	      type: 'callback',
+	      id: callback,
+	      args: [result, cleaned, proto, protoclean]
+	    });
+	  }
+	}
+
+	function getIn(base, path) {
+	  return path.reduce((obj, attr) => {
+	    return obj ? obj[attr] : null;
+	  }, base);
+	}
+
+	module.exports = Bridge;
 
 /***/ },
 /* 61 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	/**
+	 * Strip out complex data (instances, functions, and data nested > 2 levels
+	 * deep). The paths of the stripped out objects are appended to the `cleaned`
+	 * list. On the other side of the barrier, the cleaned list is used to
+	 * "re-hydrate" the cleaned representation into an object with symbols as
+	 * attributes, so that a sanitized object can be distinguished from a normal
+	 * object.
+	 *
+	 * Input: {"some": {"attr": fn()}, "other": AnInstance}
+	 * Output: {
+	 *   "some": {
+	 *     "attr": {"name": the fn.name, type: "function"}
+	 *   },
+	 *   "other": {
+	 *     "name": "AnInstance",
+	 *     "type": "object",
+	 *   },
+	 * }
+	 * and cleaned = [["some", "attr"], ["other"]]
+	 */
 
+	function dehydrate(data, cleaned, path, level) {
+	  level = level || 0;
+	  path = path || [];
+	  if (typeof data === 'function') {
+	    cleaned.push(path);
+	    return {
+	      name: data.name,
+	      type: 'function'
+	    };
+	  }
+	  if (!data || typeof data !== 'object') {
+	    if (typeof data === 'string' && data.length > 500) {
+	      return data.slice(0, 500) + '...';
+	    }
+	    // We have to do this assignment b/c Flow doesn't think "symbol" is
+	    // something typeof would return. Error 'unexpected predicate "symbol"'
+	    var type = typeof data;
+	    if (type === 'symbol') {
+	      cleaned.push(path);
+	      return {
+	        type: 'symbol',
+	        name: data.toString()
+	      };
+	    }
+	    return data;
+	  }
+	  if (data._reactFragment) {
+	    // React Fragments error if you try to inspect them.
+	    return 'A react fragment';
+	  }
+	  if (level > 2) {
+	    cleaned.push(path);
+	    return {
+	      type: Array.isArray(data) ? 'array' : 'object',
+	      name: !data.constructor || data.constructor.name === 'Object' ? '' : data.constructor.name,
+	      meta: Array.isArray(data) ? {
+	        length: data.length
+	      } : null
+	    };
+	  }
+	  if (Array.isArray(data)) {
+	    // $FlowFixMe path is not undefined.
+	    return data.map((item, i) => dehydrate(item, cleaned, path.concat([i]), level + 1));
+	  }
+	  // TODO when this is in the iframe window, we can just use Object
+	  if (data.constructor && typeof data.constructor === 'function' && data.constructor.name !== 'Object') {
+	    cleaned.push(path);
+	    return {
+	      name: data.constructor.name,
+	      type: 'object'
+	    };
+	  }
+	  var res = {};
+	  for (var name in data) {
+	    res[name] = dehydrate(data[name], cleaned, path.concat([name]), level + 1);
+	  }
+	  return res;
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	function dehydrate(data,cleaned,path,level){
-	level=level||0;
-	path=path||[];
-	if(typeof data==='function'){
-	cleaned.push(path);
-	return {
-	name:data.name,
-	type:'function'};}
-
-
-	if(!data||typeof data!=='object'){
-	if(typeof data==='string'&&data.length>500){
-	return data.slice(0,500)+'...';}
-
-
-
-	var type=typeof data;
-	if(type==='symbol'){
-	cleaned.push(path);
-	return {
-	type:'symbol',
-	name:data.toString()};}
-
-
-	return data;}
-
-	if(data._reactFragment){
-
-	return 'A react fragment';}
-
-	if(level>2){
-	cleaned.push(path);
-	return {
-	type:Array.isArray(data)?'array':'object',
-	name:!data.constructor||data.constructor.name==='Object'?'':data.constructor.name,
-	meta:Array.isArray(data)?{
-	length:data.length}:
-	null};}
-
-
-	if(Array.isArray(data)){
-
-	return data.map((item,i) => dehydrate(item,cleaned,path.concat([i]),level+1));}
-
-
-	if(data.constructor&&typeof data.constructor==='function'&&data.constructor.name!=='Object'){
-	cleaned.push(path);
-	return {
-	name:data.constructor.name,
-	type:'object'};}
-
-
-	var res={};
-	for(var name in data){
-	res[name]=dehydrate(data[name],cleaned,path.concat([name]),level+1);}
-
-	return res;}
-
-
-	module.exports=dehydrate;
+	module.exports = dehydrate;
 
 /***/ },
 /* 62 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var consts = __webpack_require__(39);
 
+	function hydrate(data, cleaned) {
+	  cleaned.forEach(path => {
+	    var last = path.pop();
+	    var obj = path.reduce((obj_, attr) => obj_ ? obj_[attr] : null, data);
+	    if (!obj || !obj[last]) {
+	      return;
+	    }
+	    var replace = {};
+	    replace[consts.name] = obj[last].name;
+	    replace[consts.type] = obj[last].type;
+	    replace[consts.meta] = obj[last].meta;
+	    replace[consts.inspected] = false;
+	    obj[last] = replace;
+	  });
+	}
 
-
-
-
-
-
-
-
-
-	var consts=__webpack_require__(39);
-
-	function hydrate(data,cleaned){
-	cleaned.forEach(path => {
-	var last=path.pop();
-	var obj=path.reduce((obj_,attr) => obj_?obj_[attr]:null,data);
-	if(!obj||!obj[last]){
-	return;}
-
-	var replace={};
-	replace[consts.name]=obj[last].name;
-	replace[consts.type]=obj[last].type;
-	replace[consts.meta]=obj[last].meta;
-	replace[consts.inspected]=false;
-	obj[last]=replace;});}
-
-
-
-	module.exports=hydrate;
+	module.exports = hydrate;
 
 /***/ },
 /* 63 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var setupBackend = __webpack_require__(65);
 
+	module.exports = function (hook, agent) {
+	  var subs = [hook.sub('renderer-attached', ({ id, renderer, helpers }) => {
+	    agent.setReactInternals(id, helpers);
+	    helpers.walkTree(agent.onMounted.bind(agent, id), agent.addRoot.bind(agent, id));
+	  }), hook.sub('root', ({ renderer, element }) => agent.addRoot(renderer, element)), hook.sub('mount', ({ renderer, element, data }) => agent.onMounted(renderer, element, data)), hook.sub('update', ({ renderer, element, data }) => agent.onUpdated(element, data)), hook.sub('unmount', ({ renderer, element }) => agent.onUnmounted(element))];
 
+	  var success = setupBackend(hook);
+	  if (!success) {
+	    return;
+	  }
 
-
-
-
-
-
-
-
-
-
-
-	var setupBackend=__webpack_require__(65);
-
-	module.exports=function(hook,agent){
-	var subs=[
-	hook.sub('renderer-attached',({id,renderer,helpers}) => {
-	agent.setReactInternals(id,helpers);
-	helpers.walkTree(agent.onMounted.bind(agent,id),agent.addRoot.bind(agent,id));}),
-
-	hook.sub('root',({renderer,element}) => agent.addRoot(renderer,element)),
-	hook.sub('mount',({renderer,element,data}) => agent.onMounted(renderer,element,data)),
-	hook.sub('update',({renderer,element,data}) => agent.onUpdated(element,data)),
-	hook.sub('unmount',({renderer,element}) => agent.onUnmounted(element))];
-
-
-	var success=setupBackend(hook);
-	if(!success){
-	return;}
-
-
-	hook.emit('react-devtools',agent);
-	hook.reactDevtoolsAgent=agent;
-	agent.on('shutdown',() => {
-	subs.forEach(fn => fn());
-	hook.reactDevtoolsAgent=null;});};
+	  hook.emit('react-devtools', agent);
+	  hook.reactDevtoolsAgent = agent;
+	  agent.on('shutdown', () => {
+	    subs.forEach(fn => fn());
+	    hook.reactDevtoolsAgent = null;
+	  });
+	};
 
 /***/ },
 /* 64 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _map=__webpack_require__(20);var _map2=_interopRequireDefault(_map);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-
-	var getData=__webpack_require__(66);
-	var getData012=__webpack_require__(67);
-
-
-
-
-
-
-
-	function attachRenderer(hook,rid,renderer){
-	var rootNodeIDMap=new _map2.default();
-	var extras={};
-
-	var isPre013=!renderer.Reconciler;
-
-
-	if(renderer.Mount.findNodeHandle&&renderer.Mount.nativeTagToRootNodeID){
-	extras.getNativeFromReactElement=function(component){
-	return renderer.Mount.findNodeHandle(component);};
-
-
-	extras.getReactElementFromNative=function(nativeTag){
-	var id=renderer.Mount.nativeTagToRootNodeID(nativeTag);
-	return rootNodeIDMap.get(id);};}else 
-
-
-	if(renderer.ComponentTree){
-	extras.getNativeFromReactElement=function(component){
-	return renderer.ComponentTree.getNodeFromInstance(component);};
-
-
-	extras.getReactElementFromNative=function(node){
-	return renderer.ComponentTree.getClosestInstanceFromNode(node);};}else 
-
-
-	if(renderer.Mount.getID&&renderer.Mount.getNode){
-	extras.getNativeFromReactElement=function(component){
-	try{
-	return renderer.Mount.getNode(component._rootNodeID);}
-	catch(e){}};
-
-
-	extras.getReactElementFromNative=function(node){
-	var id=renderer.Mount.getID(node);
-	while(node&&node.parentNode&&!id){
-	node=node.parentNode;
-	id=renderer.Mount.getID(node);}
-
-	return rootNodeIDMap.get(id);};}else 
-
-	{}
-
-
-
-	var oldMethods;
-	var oldRenderComponent;
-	var oldRenderRoot;
-
-
-	if(renderer.Mount._renderNewRootComponent){
-	oldRenderRoot=decorateResult(renderer.Mount,'_renderNewRootComponent',element => {
-	hook.emit('root',{renderer:rid,element});});}else 
-
-
-	if(renderer.Mount.renderComponent){
-	oldRenderComponent=decorateResult(renderer.Mount,'renderComponent',element => {
-	hook.emit('root',{renderer:rid,element:element._reactInternalInstance});});}
-
-
-
-	if(renderer.Component){
-
-
-
-	oldMethods=decorateMany(renderer.Component.Mixin,{
-	mountComponent(){
-	rootNodeIDMap.set(this._rootNodeID,this);
-
-
-
-
-
-	setTimeout(() => {
-	hook.emit('mount',{element:this,data:getData012(this),renderer:rid});},
-	0);},
-
-	updateComponent(){
-	setTimeout(() => {
-	hook.emit('update',{element:this,data:getData012(this),renderer:rid});},
-	0);},
-
-	unmountComponent(){
-	hook.emit('unmount',{element:this,renderer:rid});
-	rootNodeIDMap.delete(this._rootNodeID,this);}});}else 
-
-
-	if(renderer.Reconciler){
-	oldMethods=decorateMany(renderer.Reconciler,{
-	mountComponent(element,rootID,transaction,context){
-	var data=getData(element);
-	rootNodeIDMap.set(element._rootNodeID,element);
-	hook.emit('mount',{element,data,renderer:rid});},
-
-	performUpdateIfNecessary(element,nextChild,transaction,context){
-	hook.emit('update',{element,data:getData(element),renderer:rid});},
-
-	receiveComponent(element,nextChild,transaction,context){
-	hook.emit('update',{element,data:getData(element),renderer:rid});},
-
-	unmountComponent(element){
-	hook.emit('unmount',{element,renderer:rid});
-	rootNodeIDMap.delete(element._rootNodeID,element);}});}
-
-
-
-
-	extras.walkTree=function(visit,visitRoot){
-	var onMount=(component,data) => {
-	rootNodeIDMap.set(component._rootNodeID,component);
-	visit(component,data);};
-
-	walkRoots(renderer.Mount._instancesByReactRootID||renderer.Mount._instancesByContainerID,onMount,visitRoot,isPre013);};
-
-
-	extras.cleanup=function(){
-	if(oldMethods){
-	if(renderer.Component){
-	restoreMany(renderer.Component.Mixin,oldMethods);}else 
-	{
-	restoreMany(renderer.Reconciler,oldMethods);}}
-
-
-	if(oldRenderRoot){
-	renderer.Mount._renderNewRootComponent=oldRenderRoot;}
-
-	if(oldRenderComponent){
-	renderer.Mount.renderComponent=oldRenderComponent;}
-
-	oldMethods=null;
-	oldRenderRoot=null;
-	oldRenderComponent=null;};
-
-
-	return extras;}
-
-
-	function walkRoots(roots,onMount,onRoot,isPre013){
-	for(var name in roots){
-	walkNode(roots[name],onMount,isPre013);
-	onRoot(roots[name]);}}
-
-
-
-	function walkNode(element,onMount,isPre013){
-	var data=isPre013?getData012(element):getData(element);
-	if(data.children&&Array.isArray(data.children)){
-	data.children.forEach(child => walkNode(child,onMount,isPre013));}
-
-	onMount(element,data);}
-
-
-	function decorateResult(obj,attr,fn){
-	var old=obj[attr];
-	obj[attr]=function(instance){
-	var res=old.apply(this,arguments);
-	fn(res);
-	return res;};
-
-	return old;}
-
-
-	function decorate(obj,attr,fn){
-	var old=obj[attr];
-	obj[attr]=function(instance){
-	var res=old.apply(this,arguments);
-	fn.apply(this,arguments);
-	return res;};
-
-	return old;}
-
-
-	function decorateMany(source,fns){
-	var olds={};
-	for(var name in fns){
-	olds[name]=decorate(source,name,fns[name]);}
-
-	return olds;}
-
-
-	function restoreMany(source,olds){
-	for(var name in olds){
-	source[name]=olds[name];}}
-
-
-
-	module.exports=attachRenderer;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _map = __webpack_require__(20);
+
+	var _map2 = _interopRequireDefault(_map);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var getData = __webpack_require__(66);
+	var getData012 = __webpack_require__(67);
+
+	/**
+	 * This takes care of patching the renderer to emit events on the global
+	 * `Hook`. The returned object has a `.cleanup` method to un-patch everything.
+	 */
+	function attachRenderer(hook, rid, renderer) {
+	  var rootNodeIDMap = new _map2.default();
+	  var extras = {};
+	  // Before 0.13 there was no Reconciler, so we patch Component.Mixin
+	  var isPre013 = !renderer.Reconciler;
+
+	  // React Native
+	  if (renderer.Mount.findNodeHandle && renderer.Mount.nativeTagToRootNodeID) {
+	    extras.getNativeFromReactElement = function (component) {
+	      return renderer.Mount.findNodeHandle(component);
+	    };
+
+	    extras.getReactElementFromNative = function (nativeTag) {
+	      var id = renderer.Mount.nativeTagToRootNodeID(nativeTag);
+	      return rootNodeIDMap.get(id);
+	    };
+	    // React DOM 15+
+	  } else if (renderer.ComponentTree) {
+	      extras.getNativeFromReactElement = function (component) {
+	        return renderer.ComponentTree.getNodeFromInstance(component);
+	      };
+
+	      extras.getReactElementFromNative = function (node) {
+	        return renderer.ComponentTree.getClosestInstanceFromNode(node);
+	      };
+	      // React DOM
+	    } else if (renderer.Mount.getID && renderer.Mount.getNode) {
+	        extras.getNativeFromReactElement = function (component) {
+	          try {
+	            return renderer.Mount.getNode(component._rootNodeID);
+	          } catch (e) {}
+	        };
+
+	        extras.getReactElementFromNative = function (node) {
+	          var id = renderer.Mount.getID(node);
+	          while (node && node.parentNode && !id) {
+	            node = node.parentNode;
+	            id = renderer.Mount.getID(node);
+	          }
+	          return rootNodeIDMap.get(id);
+	        };
+	      } else {}
+
+	  var oldMethods;
+	  var oldRenderComponent;
+	  var oldRenderRoot;
+
+	  // React DOM
+	  if (renderer.Mount._renderNewRootComponent) {
+	    oldRenderRoot = decorateResult(renderer.Mount, '_renderNewRootComponent', element => {
+	      hook.emit('root', { renderer: rid, element });
+	    });
+	    // React Native
+	  } else if (renderer.Mount.renderComponent) {
+	      oldRenderComponent = decorateResult(renderer.Mount, 'renderComponent', element => {
+	        hook.emit('root', { renderer: rid, element: element._reactInternalInstance });
+	      });
+	    }
+
+	  if (renderer.Component) {
+	    // 0.11 - 0.12
+	    // $FlowFixMe renderer.Component is not "possibly undefined"
+	    oldMethods = decorateMany(renderer.Component.Mixin, {
+	      mountComponent() {
+	        rootNodeIDMap.set(this._rootNodeID, this);
+	        // FIXME DOMComponent calls Component.Mixin, and sets up the
+	        // `children` *after* that call, meaning we don't have access to the
+	        // children at this point. Maybe we should find something else to shim
+	        // (do we have access to DOMComponent here?) so that we don't have to
+	        // setTimeout.
+	        setTimeout(() => {
+	          hook.emit('mount', { element: this, data: getData012(this), renderer: rid });
+	        }, 0);
+	      },
+	      updateComponent() {
+	        setTimeout(() => {
+	          hook.emit('update', { element: this, data: getData012(this), renderer: rid });
+	        }, 0);
+	      },
+	      unmountComponent() {
+	        hook.emit('unmount', { element: this, renderer: rid });
+	        rootNodeIDMap.delete(this._rootNodeID, this);
+	      }
+	    });
+	  } else if (renderer.Reconciler) {
+	    oldMethods = decorateMany(renderer.Reconciler, {
+	      mountComponent(element, rootID, transaction, context) {
+	        var data = getData(element);
+	        rootNodeIDMap.set(element._rootNodeID, element);
+	        hook.emit('mount', { element, data, renderer: rid });
+	      },
+	      performUpdateIfNecessary(element, nextChild, transaction, context) {
+	        hook.emit('update', { element, data: getData(element), renderer: rid });
+	      },
+	      receiveComponent(element, nextChild, transaction, context) {
+	        hook.emit('update', { element, data: getData(element), renderer: rid });
+	      },
+	      unmountComponent(element) {
+	        hook.emit('unmount', { element, renderer: rid });
+	        rootNodeIDMap.delete(element._rootNodeID, element);
+	      }
+	    });
+	  }
+
+	  extras.walkTree = function (visit, visitRoot) {
+	    var onMount = (component, data) => {
+	      rootNodeIDMap.set(component._rootNodeID, component);
+	      visit(component, data);
+	    };
+	    walkRoots(renderer.Mount._instancesByReactRootID || renderer.Mount._instancesByContainerID, onMount, visitRoot, isPre013);
+	  };
+
+	  extras.cleanup = function () {
+	    if (oldMethods) {
+	      if (renderer.Component) {
+	        restoreMany(renderer.Component.Mixin, oldMethods);
+	      } else {
+	        restoreMany(renderer.Reconciler, oldMethods);
+	      }
+	    }
+	    if (oldRenderRoot) {
+	      renderer.Mount._renderNewRootComponent = oldRenderRoot;
+	    }
+	    if (oldRenderComponent) {
+	      renderer.Mount.renderComponent = oldRenderComponent;
+	    }
+	    oldMethods = null;
+	    oldRenderRoot = null;
+	    oldRenderComponent = null;
+	  };
+
+	  return extras;
+	}
+
+	function walkRoots(roots, onMount, onRoot, isPre013) {
+	  for (var name in roots) {
+	    walkNode(roots[name], onMount, isPre013);
+	    onRoot(roots[name]);
+	  }
+	}
+
+	function walkNode(element, onMount, isPre013) {
+	  var data = isPre013 ? getData012(element) : getData(element);
+	  if (data.children && Array.isArray(data.children)) {
+	    data.children.forEach(child => walkNode(child, onMount, isPre013));
+	  }
+	  onMount(element, data);
+	}
+
+	function decorateResult(obj, attr, fn) {
+	  var old = obj[attr];
+	  obj[attr] = function (instance) {
+	    var res = old.apply(this, arguments);
+	    fn(res);
+	    return res;
+	  };
+	  return old;
+	}
+
+	function decorate(obj, attr, fn) {
+	  var old = obj[attr];
+	  obj[attr] = function (instance) {
+	    var res = old.apply(this, arguments);
+	    fn.apply(this, arguments);
+	    return res;
+	  };
+	  return old;
+	}
+
+	function decorateMany(source, fns) {
+	  var olds = {};
+	  for (var name in fns) {
+	    olds[name] = decorate(source, name, fns[name]);
+	  }
+	  return olds;
+	}
+
+	function restoreMany(source, olds) {
+	  for (var name in olds) {
+	    source[name] = olds[name];
+	  }
+	}
+
+	module.exports = attachRenderer;
 
 /***/ },
 /* 65 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(21);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 *
+	 * This is the chrome devtools
+	 *
+	 * 1. Devtools sets the __REACT_DEVTOOLS_GLOBAL_HOOK__ global.
+	 * 2. React (if present) calls .inject() with the internal renderer
+	 * 3. Devtools sees the renderer, and then adds this backend, along with the Agent
+	 *    and whatever else is needed.
+	 * 4. The agend then calls `.emit('react-devtools', agent)`
+	 *
+	 * Now things are hooked up.
+	 *
+	 * When devtools closes, it calls `cleanup()` to remove the listeners
+	 * and any overhead caused by the backend.
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(21);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var attachRenderer = __webpack_require__(64);
 
+	module.exports = function setupBackend(hook) {
+	  var oldReact = window.React && window.React.__internals;
+	  if (oldReact && (0, _keys2.default)(hook._renderers).length === 0) {
+	    hook.inject(oldReact);
+	  }
 
+	  for (var rid in hook._renderers) {
+	    hook.helpers[rid] = attachRenderer(hook, rid, hook._renderers[rid]);
+	    hook.emit('renderer-attached', { id: rid, renderer: hook._renderers[rid], helpers: hook.helpers[rid] });
+	  }
 
+	  hook.on('renderer', ({ id, renderer }) => {
+	    hook.helpers[id] = attachRenderer(hook, id, renderer);
+	    hook.emit('renderer-attached', { id, renderer, helpers: hook.helpers[id] });
+	  });
 
+	  var shutdown = () => {
+	    for (var id in hook.helpers) {
+	      hook.helpers[id].cleanup();
+	    }
+	    hook.off('shutdown', shutdown);
+	  };
+	  hook.on('shutdown', shutdown);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	var attachRenderer=__webpack_require__(64);
-
-	module.exports=function setupBackend(hook){
-	var oldReact=window.React&&window.React.__internals;
-	if(oldReact&&(0,_keys2.default)(hook._renderers).length===0){
-	hook.inject(oldReact);}
-
-
-	for(var rid in hook._renderers){
-	hook.helpers[rid]=attachRenderer(hook,rid,hook._renderers[rid]);
-	hook.emit('renderer-attached',{id:rid,renderer:hook._renderers[rid],helpers:hook.helpers[rid]});}
-
-
-	hook.on('renderer',({id,renderer}) => {
-	hook.helpers[id]=attachRenderer(hook,id,renderer);
-	hook.emit('renderer-attached',{id,renderer,helpers:hook.helpers[id]});});
-
-
-	var shutdown=() => {
-	for(var id in hook.helpers){
-	hook.helpers[id].cleanup();}
-
-	hook.off('shutdown',shutdown);};
-
-	hook.on('shutdown',shutdown);
-
-	return true;};
+	  return true;
+	};
 
 /***/ },
 /* 66 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(13);var _extends3=_interopRequireDefault(_extends2);var _keys=__webpack_require__(21);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _extends2 = __webpack_require__(13);
 
+	var _extends3 = _interopRequireDefault(_extends2);
 
+	var _keys = __webpack_require__(21);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var copyWithSet = __webpack_require__(40);
 
+	/**
+	 * Convert a react internal instance to a sanitized data object.
+	 */
+	function getData(element) {
+	  var children = null;
+	  var props = null;
+	  var state = null;
+	  var context = null;
+	  var updater = null;
+	  var name = null;
+	  var type = null;
+	  var text = null;
+	  var publicInstance = null;
+	  var nodeType = 'Native';
+	  // If the parent is a native node without rendered children, but with
+	  // multiple string children, then the `element` that gets passed in here is
+	  // a plain value -- a string or number.
+	  if (typeof element !== 'object') {
+	    nodeType = 'Text';
+	    text = element + '';
+	  } else if (element._currentElement === null || element._currentElement === false) {
+	    nodeType = 'Empty';
+	  } else if (element._renderedComponent) {
+	    nodeType = 'NativeWrapper';
+	    children = [element._renderedComponent];
+	    props = element._instance.props;
+	    state = element._instance.state;
+	    context = element._instance.context;
+	    if (context && (0, _keys2.default)(context).length === 0) {
+	      context = null;
+	    }
+	  } else if (element._renderedChildren) {
+	    children = childrenList(element._renderedChildren);
+	  } else if (element._currentElement && element._currentElement.props) {
+	    // This is a native node without rendered children -- meaning the children
+	    // prop is just a string or (in the case of the <option>) a list of
+	    // strings & numbers.
+	    children = element._currentElement.props.children;
+	  }
 
+	  if (!props && element._currentElement && element._currentElement.props) {
+	    props = element._currentElement.props;
+	  }
 
+	  // != used deliberately here to catch undefined and null
+	  if (element._currentElement != null) {
+	    type = element._currentElement.type;
+	    if (typeof type === 'string') {
+	      name = type;
+	    } else if (element.getName) {
+	      nodeType = 'Composite';
+	      name = element.getName();
+	      // 0.14 top-level wrapper
+	      // TODO(jared): The backend should just act as if these don't exist.
+	      if (element._renderedComponent && element._currentElement.props === element._renderedComponent._currentElement) {
+	        nodeType = 'Wrapper';
+	      }
+	      if (name === null) {
+	        name = 'No display name';
+	      }
+	    } else if (typeof element._stringText === 'string') {
+	      nodeType = 'Text';
+	      text = element._stringText;
+	    } else {
+	      name = type.displayName || type.name || 'Unknown';
+	    }
+	  }
 
+	  if (element._instance) {
+	    var inst = element._instance;
+	    updater = {
+	      setState: inst.setState && inst.setState.bind(inst),
+	      forceUpdate: inst.forceUpdate && inst.forceUpdate.bind(inst),
+	      setInProps: inst.forceUpdate && setInProps.bind(null, element),
+	      setInState: inst.forceUpdate && setInState.bind(null, inst),
+	      setInContext: inst.forceUpdate && setInContext.bind(null, inst)
+	    };
+	    publicInstance = inst;
 
+	    // TODO: React ART currently falls in this bucket, but this doesn't
+	    // actually make sense and we should clean this up after stabilizing our
+	    // API for backends
+	    if (inst._renderedChildren) {
+	      children = childrenList(inst._renderedChildren);
+	    }
+	  }
 
-	var copyWithSet=__webpack_require__(40);
+	  return {
+	    nodeType,
+	    type,
+	    name,
+	    props,
+	    state,
+	    context,
+	    children,
+	    text,
+	    updater,
+	    publicInstance
+	  };
+	}
 
+	function setInProps(internalInst, path, value) {
+	  var element = internalInst._currentElement;
+	  internalInst._currentElement = (0, _extends3.default)({}, element, {
+	    props: copyWithSet(element.props, path, value)
+	  });
+	  internalInst._instance.forceUpdate();
+	}
 
+	function setInState(inst, path, value) {
+	  setIn(inst.state, path, value);
+	  inst.forceUpdate();
+	}
 
+	function setInContext(inst, path, value) {
+	  setIn(inst.context, path, value);
+	  inst.forceUpdate();
+	}
 
-	function getData(element){
-	var children=null;
-	var props=null;
-	var state=null;
-	var context=null;
-	var updater=null;
-	var name=null;
-	var type=null;
-	var text=null;
-	var publicInstance=null;
-	var nodeType='Native';
+	function setIn(obj, path, value) {
+	  var last = path.pop();
+	  var parent = path.reduce((obj_, attr) => obj_ ? obj_[attr] : null, obj);
+	  if (parent) {
+	    parent[last] = value;
+	  }
+	}
 
+	function childrenList(children) {
+	  var res = [];
+	  for (var name in children) {
+	    res.push(children[name]);
+	  }
+	  return res;
+	}
 
-
-	if(typeof element!=='object'){
-	nodeType='Text';
-	text=element+'';}else 
-	if(element._currentElement===null||element._currentElement===false){
-	nodeType='Empty';}else 
-	if(element._renderedComponent){
-	nodeType='NativeWrapper';
-	children=[element._renderedComponent];
-	props=element._instance.props;
-	state=element._instance.state;
-	context=element._instance.context;
-	if(context&&(0,_keys2.default)(context).length===0){
-	context=null;}}else 
-
-	if(element._renderedChildren){
-	children=childrenList(element._renderedChildren);}else 
-	if(element._currentElement&&element._currentElement.props){
-
-
-
-	children=element._currentElement.props.children;}
-
-
-	if(!props&&element._currentElement&&element._currentElement.props){
-	props=element._currentElement.props;}
-
-
-
-	if(element._currentElement!=null){
-	type=element._currentElement.type;
-	if(typeof type==='string'){
-	name=type;}else 
-	if(element.getName){
-	nodeType='Composite';
-	name=element.getName();
-
-
-	if(element._renderedComponent&&element._currentElement.props===element._renderedComponent._currentElement){
-	nodeType='Wrapper';}
-
-	if(name===null){
-	name='No display name';}}else 
-
-	if(typeof element._stringText==='string'){
-	nodeType='Text';
-	text=element._stringText;}else 
-	{
-	name=type.displayName||type.name||'Unknown';}}
-
-
-
-	if(element._instance){
-	var inst=element._instance;
-	updater={
-	setState:inst.setState&&inst.setState.bind(inst),
-	forceUpdate:inst.forceUpdate&&inst.forceUpdate.bind(inst),
-	setInProps:inst.forceUpdate&&setInProps.bind(null,element),
-	setInState:inst.forceUpdate&&setInState.bind(null,inst),
-	setInContext:inst.forceUpdate&&setInContext.bind(null,inst)};
-
-	publicInstance=inst;
-
-
-
-
-	if(inst._renderedChildren){
-	children=childrenList(inst._renderedChildren);}}
-
-
-
-	return {
-	nodeType,
-	type,
-	name,
-	props,
-	state,
-	context,
-	children,
-	text,
-	updater,
-	publicInstance};}
-
-
-
-	function setInProps(internalInst,path,value){
-	var element=internalInst._currentElement;
-	internalInst._currentElement=(0,_extends3.default)({},
-	element,{
-	props:copyWithSet(element.props,path,value)});
-
-	internalInst._instance.forceUpdate();}
-
-
-	function setInState(inst,path,value){
-	setIn(inst.state,path,value);
-	inst.forceUpdate();}
-
-
-	function setInContext(inst,path,value){
-	setIn(inst.context,path,value);
-	inst.forceUpdate();}
-
-
-	function setIn(obj,path,value){
-	var last=path.pop();
-	var parent=path.reduce((obj_,attr) => obj_?obj_[attr]:null,obj);
-	if(parent){
-	parent[last]=value;}}
-
-
-
-	function childrenList(children){
-	var res=[];
-	for(var name in children){
-	res.push(children[name]);}
-
-	return res;}
-
-
-	module.exports=getData;
+	module.exports = getData;
 
 /***/ },
 /* 67 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(21);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(21);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var copyWithSet = __webpack_require__(40);
 
+	function getData012(element) {
+	  var children = null;
+	  var props = element.props;
+	  var state = element.state;
+	  var context = element.context;
+	  var updater = null;
+	  var name = null;
+	  var type = null;
+	  var text = null;
+	  var publicInstance = null;
+	  var nodeType = 'Native';
+	  if (element._renderedComponent) {
+	    nodeType = 'Wrapper';
+	    children = [element._renderedComponent];
+	    if (context && (0, _keys2.default)(context).length === 0) {
+	      context = null;
+	    }
+	  } else if (element._renderedChildren) {
+	    name = element.constructor.displayName;
+	    children = childrenList(element._renderedChildren);
+	  } else if (typeof props.children === 'string') {
+	    // string children
+	    name = element.constructor.displayName;
+	    children = props.children;
+	    nodeType = 'Native';
+	  }
 
+	  if (!props && element._currentElement && element._currentElement.props) {
+	    props = element._currentElement.props;
+	  }
 
+	  if (element._currentElement) {
+	    type = element._currentElement.type;
+	    if (typeof type === 'string') {
+	      name = type;
+	    } else {
+	      nodeType = 'Composite';
+	      name = type.displayName;
+	      if (!name) {
+	        name = 'No display name';
+	      }
+	    }
+	  }
 
+	  if (!name) {
+	    name = element.constructor.displayName || 'No display name';
+	    nodeType = 'Composite';
+	  }
 
+	  if (typeof props === 'string') {
+	    nodeType = 'Text';
+	    text = props;
+	    props = null;
+	    name = null;
+	  }
 
+	  if (element.forceUpdate) {
+	    updater = {
+	      setState: element.setState.bind(element),
+	      forceUpdate: element.forceUpdate.bind(element),
+	      setInProps: element.forceUpdate && setInProps.bind(null, element),
+	      setInState: element.forceUpdate && setInState.bind(null, element),
+	      setInContext: element.forceUpdate && setInContext.bind(null, element)
+	    };
+	    publicInstance = element;
+	  }
 
+	  return {
+	    nodeType,
+	    type,
+	    name,
+	    props,
+	    state,
+	    context,
+	    children,
+	    text,
+	    updater,
+	    publicInstance
+	  };
+	}
 
-	var copyWithSet=__webpack_require__(40);
+	function setInProps(inst, path, value) {
+	  inst.props = copyWithSet(inst.props, path, value);
+	  inst.forceUpdate();
+	}
 
-	function getData012(element){
-	var children=null;
-	var props=element.props;
-	var state=element.state;
-	var context=element.context;
-	var updater=null;
-	var name=null;
-	var type=null;
-	var text=null;
-	var publicInstance=null;
-	var nodeType='Native';
-	if(element._renderedComponent){
-	nodeType='Wrapper';
-	children=[element._renderedComponent];
-	if(context&&(0,_keys2.default)(context).length===0){
-	context=null;}}else 
+	function setInState(inst, path, value) {
+	  setIn(inst.state, path, value);
+	  inst.forceUpdate();
+	}
 
-	if(element._renderedChildren){
-	name=element.constructor.displayName;
-	children=childrenList(element._renderedChildren);}else 
-	if(typeof props.children==='string'){
+	function setInContext(inst, path, value) {
+	  setIn(inst.context, path, value);
+	  inst.forceUpdate();
+	}
 
-	name=element.constructor.displayName;
-	children=props.children;
-	nodeType='Native';}
+	function setIn(obj, path, value) {
+	  var last = path.pop();
+	  var parent = path.reduce((obj_, attr) => obj_ ? obj_[attr] : null, obj);
+	  if (parent) {
+	    parent[last] = value;
+	  }
+	}
 
+	function childrenList(children) {
+	  var res = [];
+	  for (var name in children) {
+	    res.push(children[name]);
+	  }
+	  return res;
+	}
 
-	if(!props&&element._currentElement&&element._currentElement.props){
-	props=element._currentElement.props;}
-
-
-	if(element._currentElement){
-	type=element._currentElement.type;
-	if(typeof type==='string'){
-	name=type;}else 
-	{
-	nodeType='Composite';
-	name=type.displayName;
-	if(!name){
-	name='No display name';}}}
-
-
-
-
-	if(!name){
-	name=element.constructor.displayName||'No display name';
-	nodeType='Composite';}
-
-
-	if(typeof props==='string'){
-	nodeType='Text';
-	text=props;
-	props=null;
-	name=null;}
-
-
-	if(element.forceUpdate){
-	updater={
-	setState:element.setState.bind(element),
-	forceUpdate:element.forceUpdate.bind(element),
-	setInProps:element.forceUpdate&&setInProps.bind(null,element),
-	setInState:element.forceUpdate&&setInState.bind(null,element),
-	setInContext:element.forceUpdate&&setInContext.bind(null,element)};
-
-	publicInstance=element;}
-
-
-	return {
-	nodeType,
-	type,
-	name,
-	props,
-	state,
-	context,
-	children,
-	text,
-	updater,
-	publicInstance};}
-
-
-
-	function setInProps(inst,path,value){
-	inst.props=copyWithSet(inst.props,path,value);
-	inst.forceUpdate();}
-
-
-	function setInState(inst,path,value){
-	setIn(inst.state,path,value);
-	inst.forceUpdate();}
-
-
-	function setInContext(inst,path,value){
-	setIn(inst.context,path,value);
-	inst.forceUpdate();}
-
-
-	function setIn(obj,path,value){
-	var last=path.pop();
-	var parent=path.reduce((obj_,attr) => obj_?obj_[attr]:null,obj);
-	if(parent){
-	parent[last]=value;}}
-
-
-
-	function childrenList(children){
-	var res=[];
-	for(var name in children){
-	res.push(children[name]);}
-
-	return res;}
-
-
-	module.exports=getData012;
+	module.exports = getData012;
 
 /***/ },
 /* 68 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-
-
-	var Overlay=__webpack_require__(70);
-	var MultiOverlay=__webpack_require__(69);
-
-
-
-
-
-	class Highlighter{
-
-
-
-
-
-
-
-
-	constructor(win,onSelect){
-	this._win=win;
-	this._onSelect=onSelect;
-	this._overlay=null;
-	this._multiOverlay=null;
-	this._subs=[];}
-
-
-	startInspecting(){
-	this._inspecting=true;
-	this._subs=[
-	captureSubscription(this._win,'mouseover',this.onHover.bind(this)),
-	captureSubscription(this._win,'mousedown',this.onMouseDown.bind(this)),
-	captureSubscription(this._win,'click',this.onClick.bind(this))];}
-
-
-
-	stopInspecting(){
-	this._subs.forEach(unsub => unsub());
-	this.hideHighlight();}
-
-
-	remove(){
-	this.stopInspecting();
-	if(this._button&&this._button.parentNode){
-	this._button.parentNode.removeChild(this._button);}}
-
-
-
-	highlight(node,name){
-	this.removeMultiOverlay();
-	if(!this._overlay){
-	this._overlay=new Overlay(this._win);}
-
-	this._overlay.inspect(node,name);}
-
-
-	highlightMany(nodes){
-	this.removeOverlay();
-	if(!this._multiOverlay){
-	this._multiOverlay=new MultiOverlay(this._win);}
-
-	this._multiOverlay.highlightMany(nodes);}
-
-
-	hideHighlight(){
-	this._inspecting=false;
-	this.removeOverlay();
-	this.removeMultiOverlay();}
-
-
-	removeOverlay(){
-	if(!this._overlay){
-	return;}
-
-	this._overlay.remove();
-	this._overlay=null;}
-
-
-	removeMultiOverlay(){
-	if(!this._multiOverlay){
-	return;}
-
-	this._multiOverlay.remove();
-	this._multiOverlay=null;}
-
-
-	onMouseDown(evt){
-	if(!this._inspecting){
-	return;}
-
-	evt.preventDefault();
-	evt.stopPropagation();
-	evt.cancelBubble=true;
-	this._onSelect(evt.target);
-	return;}
-
-
-	onClick(evt){
-	if(!this._inspecting){
-	return;}
-
-	this._subs.forEach(unsub => unsub());
-	evt.preventDefault();
-	evt.stopPropagation();
-	evt.cancelBubble=true;
-	this.hideHighlight();}
-
-
-	onHover(evt){
-	if(!this._inspecting){
-	return;}
-
-	evt.preventDefault();
-	evt.stopPropagation();
-	evt.cancelBubble=true;
-	this.highlight(evt.target);}
-
-
-	injectButton(){
-	this._button=makeMagnifier();
-	this._button.onclick=this.startInspecting.bind(this);
-	this._win.document.body.appendChild(this._button);}}
-
-
-
-	function captureSubscription(obj,evt,cb){
-	obj.addEventListener(evt,cb,true);
-	return () => obj.removeEventListener(evt,cb,true);}
-
-
-	function makeMagnifier(){
-	var button=window.document.createElement('button');
-	button.innerHTML='&#128269;';
-	button.style.backgroundColor='transparent';
-	button.style.border='none';
-	button.style.outline='none';
-	button.style.cursor='pointer';
-	button.style.position='fixed';
-	button.style.bottom='10px';
-	button.style.right='10px';
-	button.style.fontSize='30px';
-	button.style.zIndex=10000000;
-	return button;}
-
-
-	module.exports=Highlighter;
+	var Overlay = __webpack_require__(70);
+	var MultiOverlay = __webpack_require__(69);
+
+	/**
+	 * Manages the highlighting of items on an html page, as well as
+	 * hover-to-inspect.
+	 */
+	class Highlighter {
+
+	  constructor(win, onSelect) {
+	    this._win = win;
+	    this._onSelect = onSelect;
+	    this._overlay = null;
+	    this._multiOverlay = null;
+	    this._subs = [];
+	  }
+
+	  startInspecting() {
+	    this._inspecting = true;
+	    this._subs = [captureSubscription(this._win, 'mouseover', this.onHover.bind(this)), captureSubscription(this._win, 'mousedown', this.onMouseDown.bind(this)), captureSubscription(this._win, 'click', this.onClick.bind(this))];
+	  }
+
+	  stopInspecting() {
+	    this._subs.forEach(unsub => unsub());
+	    this.hideHighlight();
+	  }
+
+	  remove() {
+	    this.stopInspecting();
+	    if (this._button && this._button.parentNode) {
+	      this._button.parentNode.removeChild(this._button);
+	    }
+	  }
+
+	  highlight(node, name) {
+	    this.removeMultiOverlay();
+	    if (!this._overlay) {
+	      this._overlay = new Overlay(this._win);
+	    }
+	    this._overlay.inspect(node, name);
+	  }
+
+	  highlightMany(nodes) {
+	    this.removeOverlay();
+	    if (!this._multiOverlay) {
+	      this._multiOverlay = new MultiOverlay(this._win);
+	    }
+	    this._multiOverlay.highlightMany(nodes);
+	  }
+
+	  hideHighlight() {
+	    this._inspecting = false;
+	    this.removeOverlay();
+	    this.removeMultiOverlay();
+	  }
+
+	  removeOverlay() {
+	    if (!this._overlay) {
+	      return;
+	    }
+	    this._overlay.remove();
+	    this._overlay = null;
+	  }
+
+	  removeMultiOverlay() {
+	    if (!this._multiOverlay) {
+	      return;
+	    }
+	    this._multiOverlay.remove();
+	    this._multiOverlay = null;
+	  }
+
+	  onMouseDown(evt) {
+	    if (!this._inspecting) {
+	      return;
+	    }
+	    evt.preventDefault();
+	    evt.stopPropagation();
+	    evt.cancelBubble = true;
+	    this._onSelect(evt.target);
+	    return;
+	  }
+
+	  onClick(evt) {
+	    if (!this._inspecting) {
+	      return;
+	    }
+	    this._subs.forEach(unsub => unsub());
+	    evt.preventDefault();
+	    evt.stopPropagation();
+	    evt.cancelBubble = true;
+	    this.hideHighlight();
+	  }
+
+	  onHover(evt) {
+	    if (!this._inspecting) {
+	      return;
+	    }
+	    evt.preventDefault();
+	    evt.stopPropagation();
+	    evt.cancelBubble = true;
+	    this.highlight(evt.target);
+	  }
+
+	  injectButton() {
+	    this._button = makeMagnifier();
+	    this._button.onclick = this.startInspecting.bind(this);
+	    this._win.document.body.appendChild(this._button);
+	  }
+	}
+
+	function captureSubscription(obj, evt, cb) {
+	  obj.addEventListener(evt, cb, true);
+	  return () => obj.removeEventListener(evt, cb, true);
+	}
+
+	function makeMagnifier() {
+	  var button = window.document.createElement('button');
+	  button.innerHTML = '&#128269;';
+	  button.style.backgroundColor = 'transparent';
+	  button.style.border = 'none';
+	  button.style.outline = 'none';
+	  button.style.cursor = 'pointer';
+	  button.style.position = 'fixed';
+	  button.style.bottom = '10px';
+	  button.style.right = '10px';
+	  button.style.fontSize = '30px';
+	  button.style.zIndex = 10000000;
+	  return button;
+	}
+
+	module.exports = Highlighter;
 
 /***/ },
 /* 69 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var assign = __webpack_require__(38);
 
 
+	class MultiOverlay {
 
+	  constructor(window) {
+	    this.win = window;
+	    var doc = window.document;
+	    this.container = doc.createElement('div');
+	    doc.body.appendChild(this.container);
+	  }
 
+	  highlightMany(nodes) {
+	    this.container.innerHTML = '';
+	    nodes.forEach(node => {
+	      var div = this.win.document.createElement('div');
+	      var box = node.getBoundingClientRect();
+	      assign(div.style, {
+	        top: box.top + 'px',
+	        left: box.left + 'px',
+	        width: box.width + 'px',
+	        height: box.height + 'px',
+	        border: '2px dotted rgba(200, 100, 100, .8)',
+	        boxSizing: 'border-box',
+	        backgroundColor: 'rgba(200, 100, 100, .2)',
+	        position: 'fixed',
+	        zIndex: 10000000,
+	        pointerEvents: 'none'
+	      });
+	      this.container.appendChild(div);
+	    });
+	  }
 
+	  remove() {
+	    if (this.container.parentNode) {
+	      this.container.parentNode.removeChild(this.container);
+	    }
+	  }
+	}
 
-
-
-
-
-	var assign=__webpack_require__(38);
-
-
-	class MultiOverlay{
-
-
-
-	constructor(window){
-	this.win=window;
-	var doc=window.document;
-	this.container=doc.createElement('div');
-	doc.body.appendChild(this.container);}
-
-
-	highlightMany(nodes){
-	this.container.innerHTML='';
-	nodes.forEach(node => {
-	var div=this.win.document.createElement('div');
-	var box=node.getBoundingClientRect();
-	assign(div.style,{
-	top:box.top+'px',
-	left:box.left+'px',
-	width:box.width+'px',
-	height:box.height+'px',
-	border:'2px dotted rgba(200, 100, 100, .8)',
-	boxSizing:'border-box',
-	backgroundColor:'rgba(200, 100, 100, .2)',
-	position:'fixed',
-	zIndex:10000000,
-	pointerEvents:'none'});
-
-	this.container.appendChild(div);});}
-
-
-
-	remove(){
-	if(this.container.parentNode){
-	this.container.parentNode.removeChild(this.container);}}}
-
-
-
-
-	module.exports=MultiOverlay;
+	module.exports = MultiOverlay;
 
 /***/ },
 /* 70 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-	var assign=__webpack_require__(38);
-
-
-	class Overlay{
-
-
-
-
-
-
-
-
-
-
-	constructor(window){
-	var doc=window.document;
-	this.win=window;
-	this.container=doc.createElement('div');
-	this.node=doc.createElement('div');
-	this.border=doc.createElement('div');
-	this.padding=doc.createElement('div');
-	this.content=doc.createElement('div');
-
-	this.border.style.borderColor=overlayStyles.border;
-	this.padding.style.borderColor=overlayStyles.padding;
-	this.content.style.backgroundColor=overlayStyles.background;
-
-	assign(this.node.style,{
-	borderColor:overlayStyles.margin,
-	pointerEvents:'none',
-	position:'fixed'});
-
-
-	this.tip=doc.createElement('div');
-	assign(this.tip.style,{
-	border:'1px solid #aaa',
-	backgroundColor:'rgb(255, 255, 178)',
-	fontFamily:'sans-serif',
-	color:'orange',
-	padding:'3px 5px',
-	position:'fixed',
-	fontSize:'10px'});
-
-
-	this.nameSpan=doc.createElement('span');
-	this.tip.appendChild(this.nameSpan);
-	assign(this.nameSpan.style,{
-	color:'rgb(136, 18, 128)',
-	marginRight:'5px'});
-
-	this.dimSpan=doc.createElement('span');
-	this.tip.appendChild(this.dimSpan);
-	assign(this.dimSpan.style,{
-	color:'#888'});
-
-
-	this.container.style.zIndex=10000000;
-	this.node.style.zIndex=10000000;
-	this.tip.style.zIndex=10000000;
-	this.container.appendChild(this.node);
-	this.container.appendChild(this.tip);
-	this.node.appendChild(this.border);
-	this.border.appendChild(this.padding);
-	this.padding.appendChild(this.content);
-	doc.body.appendChild(this.container);}
-
-
-	remove(){
-	if(this.container.parentNode){
-	this.container.parentNode.removeChild(this.container);}}
-
-
-
-	inspect(node,name){
-
-
-	if(node.nodeType!==Node.ELEMENT_NODE){
-	return;}
-
-	var box=node.getBoundingClientRect();
-	var dims=getElementDimensions(node);
-
-	boxWrap(dims,'margin',this.node);
-	boxWrap(dims,'border',this.border);
-	boxWrap(dims,'padding',this.padding);
-
-	assign(this.content.style,{
-	height:box.height-dims.borderTop-dims.borderBottom-dims.paddingTop-dims.paddingBottom+'px',
-	width:box.width-dims.borderLeft-dims.borderRight-dims.paddingLeft-dims.paddingRight+'px'});
-
-
-	assign(this.node.style,{
-	top:box.top-dims.marginTop+'px',
-	left:box.left-dims.marginLeft+'px'});
-
-
-	this.nameSpan.textContent=name||node.nodeName.toLowerCase();
-	this.dimSpan.textContent=box.width+'px × '+box.height+'px';
-
-	var tipPos=findTipPos({
-	top:box.top-dims.marginTop,
-	left:box.left-dims.marginLeft,
-	height:box.height+dims.marginTop+dims.marginBottom,
-	width:box.width+dims.marginLeft+dims.marginRight},
-	this.win);
-	assign(this.tip.style,tipPos);}}
-
-
-
-	function findTipPos(dims,win){
-	var tipHeight=20;
-	var margin=5;
-	var top;
-	if(dims.top+dims.height+tipHeight<=win.innerHeight){
-	if(dims.top+dims.height<0){
-	top=margin;}else 
-	{
-	top=dims.top+dims.height+margin;}}else 
-
-	if(dims.top-tipHeight<=win.innerHeight){
-	if(dims.top-tipHeight-margin<margin){
-	top=margin;}else 
-	{
-	top=dims.top-tipHeight-margin;}}else 
-
-	{
-	top=win.innerHeight-tipHeight-margin;}
-
-
-	top+='px';
-
-	if(dims.left<0){
-	return {top,left:margin};}
-
-	if(dims.left+200>win.innerWidth){
-	return {top,right:margin};}
-
-	return {top,left:dims.left+margin+'px'};}
-
-
-	function getElementDimensions(element){
-	var calculatedStyle=window.getComputedStyle(element);
-
-	return {
-	borderLeft:+calculatedStyle.borderLeftWidth.match(/[0-9]*/)[0],
-	borderRight:+calculatedStyle.borderRightWidth.match(/[0-9]*/)[0],
-	borderTop:+calculatedStyle.borderTopWidth.match(/[0-9]*/)[0],
-	borderBottom:+calculatedStyle.borderBottomWidth.match(/[0-9]*/)[0],
-	marginLeft:+calculatedStyle.marginLeft.match(/[0-9]*/)[0],
-	marginRight:+calculatedStyle.marginRight.match(/[0-9]*/)[0],
-	marginTop:+calculatedStyle.marginTop.match(/[0-9]*/)[0],
-	marginBottom:+calculatedStyle.marginBottom.match(/[0-9]*/)[0],
-	paddingLeft:+calculatedStyle.paddingLeft.match(/[0-9]*/)[0],
-	paddingRight:+calculatedStyle.paddingRight.match(/[0-9]*/)[0],
-	paddingTop:+calculatedStyle.paddingTop.match(/[0-9]*/)[0],
-	paddingBottom:+calculatedStyle.paddingBottom.match(/[0-9]*/)[0]};}
-
-
-
-	function boxWrap(dims,what,node){
-	assign(node.style,{
-	borderTopWidth:dims[what+'Top']+'px',
-	borderLeftWidth:dims[what+'Left']+'px',
-	borderRightWidth:dims[what+'Right']+'px',
-	borderBottomWidth:dims[what+'Bottom']+'px',
-	borderStyle:'solid'});}
-
-
-
-	var overlayStyles={
-	background:'rgba(120, 170, 210, 0.7)',
-	padding:'rgba(77, 200, 0, 0.3)',
-	margin:'rgba(255, 155, 0, 0.3)',
-	border:'rgba(255, 200, 50, 0.3)'};
-
-
-	module.exports=Overlay;
+	var assign = __webpack_require__(38);
+
+
+	class Overlay {
+
+	  constructor(window) {
+	    var doc = window.document;
+	    this.win = window;
+	    this.container = doc.createElement('div');
+	    this.node = doc.createElement('div');
+	    this.border = doc.createElement('div');
+	    this.padding = doc.createElement('div');
+	    this.content = doc.createElement('div');
+
+	    this.border.style.borderColor = overlayStyles.border;
+	    this.padding.style.borderColor = overlayStyles.padding;
+	    this.content.style.backgroundColor = overlayStyles.background;
+
+	    assign(this.node.style, {
+	      borderColor: overlayStyles.margin,
+	      pointerEvents: 'none',
+	      position: 'fixed'
+	    });
+
+	    this.tip = doc.createElement('div');
+	    assign(this.tip.style, {
+	      border: '1px solid #aaa',
+	      backgroundColor: 'rgb(255, 255, 178)',
+	      fontFamily: 'sans-serif',
+	      color: 'orange',
+	      padding: '3px 5px',
+	      position: 'fixed',
+	      fontSize: '10px'
+	    });
+
+	    this.nameSpan = doc.createElement('span');
+	    this.tip.appendChild(this.nameSpan);
+	    assign(this.nameSpan.style, {
+	      color: 'rgb(136, 18, 128)',
+	      marginRight: '5px'
+	    });
+	    this.dimSpan = doc.createElement('span');
+	    this.tip.appendChild(this.dimSpan);
+	    assign(this.dimSpan.style, {
+	      color: '#888'
+	    });
+
+	    this.container.style.zIndex = 10000000;
+	    this.node.style.zIndex = 10000000;
+	    this.tip.style.zIndex = 10000000;
+	    this.container.appendChild(this.node);
+	    this.container.appendChild(this.tip);
+	    this.node.appendChild(this.border);
+	    this.border.appendChild(this.padding);
+	    this.padding.appendChild(this.content);
+	    doc.body.appendChild(this.container);
+	  }
+
+	  remove() {
+	    if (this.container.parentNode) {
+	      this.container.parentNode.removeChild(this.container);
+	    }
+	  }
+
+	  inspect(node, name) {
+	    // We can't get the size of text nodes or comment nodes. React as of v15
+	    // heavily uses comment nodes to delimit text.
+	    if (node.nodeType !== Node.ELEMENT_NODE) {
+	      return;
+	    }
+	    var box = node.getBoundingClientRect();
+	    var dims = getElementDimensions(node);
+
+	    boxWrap(dims, 'margin', this.node);
+	    boxWrap(dims, 'border', this.border);
+	    boxWrap(dims, 'padding', this.padding);
+
+	    assign(this.content.style, {
+	      height: box.height - dims.borderTop - dims.borderBottom - dims.paddingTop - dims.paddingBottom + 'px',
+	      width: box.width - dims.borderLeft - dims.borderRight - dims.paddingLeft - dims.paddingRight + 'px'
+	    });
+
+	    assign(this.node.style, {
+	      top: box.top - dims.marginTop + 'px',
+	      left: box.left - dims.marginLeft + 'px'
+	    });
+
+	    this.nameSpan.textContent = name || node.nodeName.toLowerCase();
+	    this.dimSpan.textContent = box.width + 'px × ' + box.height + 'px';
+
+	    var tipPos = findTipPos({
+	      top: box.top - dims.marginTop,
+	      left: box.left - dims.marginLeft,
+	      height: box.height + dims.marginTop + dims.marginBottom,
+	      width: box.width + dims.marginLeft + dims.marginRight
+	    }, this.win);
+	    assign(this.tip.style, tipPos);
+	  }
+	}
+
+	function findTipPos(dims, win) {
+	  var tipHeight = 20;
+	  var margin = 5;
+	  var top;
+	  if (dims.top + dims.height + tipHeight <= win.innerHeight) {
+	    if (dims.top + dims.height < 0) {
+	      top = margin;
+	    } else {
+	      top = dims.top + dims.height + margin;
+	    }
+	  } else if (dims.top - tipHeight <= win.innerHeight) {
+	    if (dims.top - tipHeight - margin < margin) {
+	      top = margin;
+	    } else {
+	      top = dims.top - tipHeight - margin;
+	    }
+	  } else {
+	    top = win.innerHeight - tipHeight - margin;
+	  }
+
+	  top += 'px';
+
+	  if (dims.left < 0) {
+	    return { top, left: margin };
+	  }
+	  if (dims.left + 200 > win.innerWidth) {
+	    return { top, right: margin };
+	  }
+	  return { top, left: dims.left + margin + 'px' };
+	}
+
+	function getElementDimensions(element) {
+	  var calculatedStyle = window.getComputedStyle(element);
+
+	  return {
+	    borderLeft: +calculatedStyle.borderLeftWidth.match(/[0-9]*/)[0],
+	    borderRight: +calculatedStyle.borderRightWidth.match(/[0-9]*/)[0],
+	    borderTop: +calculatedStyle.borderTopWidth.match(/[0-9]*/)[0],
+	    borderBottom: +calculatedStyle.borderBottomWidth.match(/[0-9]*/)[0],
+	    marginLeft: +calculatedStyle.marginLeft.match(/[0-9]*/)[0],
+	    marginRight: +calculatedStyle.marginRight.match(/[0-9]*/)[0],
+	    marginTop: +calculatedStyle.marginTop.match(/[0-9]*/)[0],
+	    marginBottom: +calculatedStyle.marginBottom.match(/[0-9]*/)[0],
+	    paddingLeft: +calculatedStyle.paddingLeft.match(/[0-9]*/)[0],
+	    paddingRight: +calculatedStyle.paddingRight.match(/[0-9]*/)[0],
+	    paddingTop: +calculatedStyle.paddingTop.match(/[0-9]*/)[0],
+	    paddingBottom: +calculatedStyle.paddingBottom.match(/[0-9]*/)[0]
+	  };
+	}
+
+	function boxWrap(dims, what, node) {
+	  assign(node.style, {
+	    borderTopWidth: dims[what + 'Top'] + 'px',
+	    borderLeftWidth: dims[what + 'Left'] + 'px',
+	    borderRightWidth: dims[what + 'Right'] + 'px',
+	    borderBottomWidth: dims[what + 'Bottom'] + 'px',
+	    borderStyle: 'solid'
+	  });
+	}
+
+	var overlayStyles = {
+	  background: 'rgba(120, 170, 210, 0.7)',
+	  padding: 'rgba(77, 200, 0, 0.3)',
+	  margin: 'rgba(255, 155, 0, 0.3)',
+	  border: 'rgba(255, 200, 50, 0.3)'
+	};
+
+	module.exports = Overlay;
 
 /***/ },
 /* 71 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var Highlighter = __webpack_require__(68);
 
-
-
-
-
-
-
-
-
-
-	var Highlighter=__webpack_require__(68);
-
-
-
-	module.exports=function setup(agent){
-	var hl=new Highlighter(window,node => {
-	agent.selectFromDOMNode(node);});
-
-	agent.on('highlight',data => hl.highlight(data.node,data.name));
-	agent.on('highlightMany',nodes => hl.highlightMany(nodes));
-	agent.on('hideHighlight',() => hl.hideHighlight());
-	agent.on('startInspecting',() => hl.startInspecting());
-	agent.on('stopInspecting',() => hl.stopInspecting());
-	agent.on('shutdown',() => {
-	hl.remove();});};
+	module.exports = function setup(agent) {
+	  var hl = new Highlighter(window, node => {
+	    agent.selectFromDOMNode(node);
+	  });
+	  agent.on('highlight', data => hl.highlight(data.node, data.name));
+	  agent.on('highlightMany', nodes => hl.highlightMany(nodes));
+	  agent.on('hideHighlight', () => hl.hideHighlight());
+	  agent.on('startInspecting', () => hl.startInspecting());
+	  agent.on('stopInspecting', () => hl.stopInspecting());
+	  agent.on('shutdown', () => {
+	    hl.remove();
+	  });
+	};
 
 /***/ },
 /* 72 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+
 	'use strict';
 
+	const BananaSlugAbstractNodeMeasurer = __webpack_require__(41);
+	const BananaSlugAbstractNodePresenter = __webpack_require__(42);
+	const BananaSlugWebNodeMeasurer = __webpack_require__(73);
+	const BananaSlugWebNodePresenter = __webpack_require__(74);
 
+	const NODE_TYPE_COMPOSITE = 'Composite';
 
+	class BananaSlugBackendManager {
 
+	  constructor(agent) {
+	    this._onMeasureNode = this._onMeasureNode.bind(this);
 
+	    var useDOM = agent.capabilities.dom;
 
+	    this._measurer = useDOM ? new BananaSlugWebNodeMeasurer() : new BananaSlugAbstractNodeMeasurer();
 
+	    this._presenter = useDOM ? new BananaSlugWebNodePresenter() : new BananaSlugAbstractNodePresenter();
 
+	    this._isActive = false;
+	    agent.on('bananaslugchange', this._onBananaSlugChange.bind(this));
+	    agent.on('update', this._onUpdate.bind(this, agent));
+	    agent.on('shutdown', this._shutdown.bind(this));
+	  }
 
+	  _onUpdate(agent, obj) {
+	    if (!obj.publicInstance || !obj.id || obj.nodeType !== NODE_TYPE_COMPOSITE) {
+	      return;
+	    }
 
+	    var node = agent.getNodeForID(obj.id);
+	    if (!node) {
+	      return;
+	    }
 
+	    this._measurer.request(node, this._onMeasureNode);
+	  }
 
-	const BananaSlugAbstractNodeMeasurer=__webpack_require__(41);
-	const BananaSlugAbstractNodePresenter=__webpack_require__(42);
-	const BananaSlugWebNodeMeasurer=__webpack_require__(73);
-	const BananaSlugWebNodePresenter=__webpack_require__(74);
+	  _onMeasureNode(measurement) {
+	    this._presenter.present(measurement);
+	  }
 
+	  _onBananaSlugChange(state) {
+	    this._presenter.setEnabled(state.enabled);
+	  }
 
+	  _shutdown() {
+	    this._presenter.setEnabled(false);
+	  }
+	}
 
+	function init(agent) {
+	  return new BananaSlugBackendManager(agent);
+	}
 
-
-
-
-
-	const NODE_TYPE_COMPOSITE='Composite';
-
-	class BananaSlugBackendManager{
-
-
-
-
-
-	constructor(agent){
-	this._onMeasureNode=this._onMeasureNode.bind(this);
-
-	var useDOM=agent.capabilities.dom;
-
-	this._measurer=useDOM?
-	new BananaSlugWebNodeMeasurer():
-	new BananaSlugAbstractNodeMeasurer();
-
-	this._presenter=useDOM?
-	new BananaSlugWebNodePresenter():
-	new BananaSlugAbstractNodePresenter();
-
-	this._isActive=false;
-	agent.on('bananaslugchange',this._onBananaSlugChange.bind(this));
-	agent.on('update',this._onUpdate.bind(this,agent));
-	agent.on('shutdown',this._shutdown.bind(this));}
-
-
-	_onUpdate(agent,obj){
-	if(
-	!obj.publicInstance||
-	!obj.id||
-	obj.nodeType!==NODE_TYPE_COMPOSITE)
-	{
-	return;}
-
-
-	var node=agent.getNodeForID(obj.id);
-	if(!node){
-	return;}
-
-
-	this._measurer.request(node,this._onMeasureNode);}
-
-
-	_onMeasureNode(measurement){
-	this._presenter.present(measurement);}
-
-
-	_onBananaSlugChange(state){
-	this._presenter.setEnabled(state.enabled);}
-
-
-	_shutdown(){
-	this._presenter.setEnabled(false);}}
-
-
-
-	function init(agent){
-	return new BananaSlugBackendManager(agent);}
-
-
-	module.exports={
-	init};
+	module.exports = {
+	  init
+	};
 
 /***/ },
 /* 73 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+
 	'use strict';
 
+	const BananaSlugAbstractNodeMeasurer = __webpack_require__(41);
 
+	const DUMMY = {
+	  bottom: 0,
+	  expiration: 0,
+	  height: 0,
+	  id: '',
+	  left: 0,
+	  right: 0,
+	  scrollX: 0,
+	  scrollY: 0,
+	  top: 0,
+	  width: 0
+	};
 
+	class BananaSlugWebNodeMeasurer extends BananaSlugAbstractNodeMeasurer {
+	  measureImpl(node) {
+	    if (!node || typeof node.getBoundingClientRect !== 'function') {
+	      return DUMMY;
+	    }
 
+	    var rect = node.getBoundingClientRect();
+	    var scrollX = Math.max(document.body ? document.body.scrollLeft : 0, document.documentElement.scrollLeft, window.pageXOffset || 0, window.scrollX || 0);
 
+	    var scrollY = Math.max(document.body ? document.body.scrollTop : 0, document.documentElement.scrollTop, window.pageYOffset || 0, window.scrollY || 0);
 
+	    return {
+	      bottom: rect.bottom,
+	      expiration: 0,
+	      height: rect.height,
+	      id: '',
+	      left: rect.left,
+	      right: rect.right,
+	      scrollX,
+	      scrollY,
+	      top: rect.top,
+	      width: rect.width
+	    };
+	  }
+	}
 
-
-
-
-
-
-	const BananaSlugAbstractNodeMeasurer=__webpack_require__(41);
-
-
-
-
-
-	const DUMMY={
-	bottom:0,
-	expiration:0,
-	height:0,
-	id:'',
-	left:0,
-	right:0,
-	scrollX:0,
-	scrollY:0,
-	top:0,
-	width:0};
-
-
-	class BananaSlugWebNodeMeasurer extends BananaSlugAbstractNodeMeasurer{
-	measureImpl(node){
-	if(!node||typeof node.getBoundingClientRect!=='function'){
-	return DUMMY;}
-
-
-	var rect=node.getBoundingClientRect();
-	var scrollX=Math.max(
-	document.body?document.body.scrollLeft:0,
-	document.documentElement.scrollLeft,
-	window.pageXOffset||0,
-	window.scrollX||0);
-
-
-	var scrollY=Math.max(
-	document.body?document.body.scrollTop:0,
-	document.documentElement.scrollTop,
-	window.pageYOffset||0,
-	window.scrollY||0);
-
-
-	return {
-	bottom:rect.bottom,
-	expiration:0,
-	height:rect.height,
-	id:'',
-	left:rect.left,
-	right:rect.right,
-	scrollX,
-	scrollY,
-	top:rect.top,
-	width:rect.width};}}
-
-
-
-
-	module.exports=BananaSlugWebNodeMeasurer;
+	module.exports = BananaSlugWebNodeMeasurer;
 
 /***/ },
 /* 74 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+
 	'use strict';
 
+	const BananaSlugAbstractNodePresenter = __webpack_require__(42);
 
+	const OUTLINE_COLOR = '#f0f0f0';
 
-
-
-
-
-
-
-
-
-
-	const BananaSlugAbstractNodePresenter=__webpack_require__(42);
-
-	const OUTLINE_COLOR='#f0f0f0';
-
-	const COLORS=[
-
-	'#55cef6',
-	'#55f67b',
-	'#a5f655',
-	'#f4f655',
-	'#f6a555',
-	'#f66855',
-
+	const COLORS = [
+	// coolest
+	'#55cef6', '#55f67b', '#a5f655', '#f4f655', '#f6a555', '#f66855',
+	// hottest
 	'#ff0000'];
 
+	const HOTTEST_COLOR = COLORS[COLORS.length - 1];
 
-	const HOTTEST_COLOR=COLORS[COLORS.length-1];
+	function drawBorder(ctx, measurement, borderWidth, borderColor) {
+	  // outline
+	  ctx.lineWidth = 1;
+	  ctx.strokeStyle = OUTLINE_COLOR;
 
-	function drawBorder(ctx,measurement,borderWidth,borderColor){
+	  ctx.strokeRect(measurement.left - 1, measurement.top - 1, measurement.width + 2, measurement.height + 2);
 
-	ctx.lineWidth=1;
-	ctx.strokeStyle=OUTLINE_COLOR;
+	  // inset
+	  ctx.lineWidth = 1;
+	  ctx.strokeStyle = OUTLINE_COLOR;
+	  ctx.strokeRect(measurement.left + borderWidth, measurement.top + borderWidth, measurement.width - borderWidth, measurement.height - borderWidth);
+	  ctx.strokeStyle = borderColor;
 
-	ctx.strokeRect(
-	measurement.left-1,
-	measurement.top-1,
-	measurement.width+2,
-	measurement.height+2);
+	  if (measurement.should_update) {
+	    ctx.setLineDash([2]);
+	  } else {
+	    ctx.setLineDash([0]);
+	  }
 
+	  // border
+	  ctx.lineWidth = '' + borderWidth;
+	  ctx.strokeRect(measurement.left + Math.floor(borderWidth / 2), measurement.top + Math.floor(borderWidth / 2), measurement.width - borderWidth, measurement.height - borderWidth);
 
+	  ctx.setLineDash([0]);
+	}
 
-	ctx.lineWidth=1;
-	ctx.strokeStyle=OUTLINE_COLOR;
-	ctx.strokeRect(
-	measurement.left+borderWidth,
-	measurement.top+borderWidth,
-	measurement.width-borderWidth,
-	measurement.height-borderWidth);
+	const CANVAS_NODE_ID = 'BananaSlugWebNodePresenter';
 
-	ctx.strokeStyle=borderColor;
+	class BananaSlugWebNodePresenter extends BananaSlugAbstractNodePresenter {
 
+	  constructor() {
+	    super();
+	    this._canvas = null;
+	  }
 
-	if(measurement.should_update){
-	ctx.setLineDash([2]);}else 
-	{
-	ctx.setLineDash([0]);}
+	  drawImpl(pool) {
+	    this._ensureCanvas();
+	    var canvas = this._canvas;
+	    var ctx = canvas.getContext('2d');
+	    ctx.clearRect(0, 0, canvas.width, canvas.height);
+	    for (const [measurement, data] of pool.entries()) {
+	      const color = COLORS[data.hit - 1] || HOTTEST_COLOR;
+	      drawBorder(ctx, measurement, 1, color);
+	    }
+	  }
 
+	  clearImpl() {
+	    var canvas = this._canvas;
+	    if (canvas === null) {
+	      return;
+	    }
 
+	    if (!canvas.parentNode) {
+	      return;
+	    }
 
-	ctx.lineWidth=''+borderWidth;
-	ctx.strokeRect(
-	measurement.left+Math.floor(borderWidth/2),
-	measurement.top+Math.floor(borderWidth/2),
-	measurement.width-borderWidth,
-	measurement.height-borderWidth);
+	    var ctx = canvas.getContext('2d');
+	    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+	    canvas.parentNode.removeChild(canvas);
+	    this._canvas = null;
+	  }
 
-	ctx.setLineDash([0]);}
+	  _ensureCanvas() {
+	    var canvas = this._canvas;
+	    if (canvas === null) {
+	      canvas = window.document.getElementById(CANVAS_NODE_ID) || window.document.createElement('canvas');
 
-
-	const CANVAS_NODE_ID='BananaSlugWebNodePresenter';
-
-	class BananaSlugWebNodePresenter extends BananaSlugAbstractNodePresenter{
-
-
-	constructor(){
-	super();
-	this._canvas=null;}
-
-
-	drawImpl(pool){
-	this._ensureCanvas();
-	var canvas=this._canvas;
-	var ctx=canvas.getContext('2d');
-	ctx.clearRect(
-	0,
-	0,
-	canvas.width,
-	canvas.height);
-
-	for(const [measurement,data] of pool.entries()){
-	const color=COLORS[data.hit-1]||HOTTEST_COLOR;
-	drawBorder(ctx,measurement,1,color);}}
-
-
-
-	clearImpl(){
-	var canvas=this._canvas;
-	if(canvas===null){
-	return;}
-
-
-	if(!canvas.parentNode){
-	return;}
-
-
-	var ctx=canvas.getContext('2d');
-	ctx.clearRect(
-	0,
-	0,
-	canvas.width,
-	canvas.height);
-
-
-	canvas.parentNode.removeChild(canvas);
-	this._canvas=null;}
-
-
-	_ensureCanvas(){
-	var canvas=this._canvas;
-	if(canvas===null){
-	canvas=
-	window.document.getElementById(CANVAS_NODE_ID)||
-	window.document.createElement('canvas');
-
-	canvas.id=CANVAS_NODE_ID;
-	canvas.width=window.screen.availWidth;
-	canvas.height=window.screen.availHeight;
-	canvas.style.cssText=`
+	      canvas.id = CANVAS_NODE_ID;
+	      canvas.width = window.screen.availWidth;
+	      canvas.height = window.screen.availHeight;
+	      canvas.style.cssText = `
 	        xx-background-color: red;
 	        xx-opacity: 0.5;
 	        bottom: 0;
@@ -9307,226 +9175,218 @@
 	        right: 0;
 	        top: 0;
 	        z-index: 1000000000;
-	      `;}
+	      `;
+	    }
 
+	    if (!canvas.parentNode) {
+	      var root = window.document.documentElement;
+	      root.insertBefore(canvas, root.firstChild);
+	    }
+	    this._canvas = canvas;
+	  }
+	}
 
-	if(!canvas.parentNode){
-	var root=window.document.documentElement;
-	root.insertBefore(canvas,root.firstChild);}
-
-	this._canvas=canvas;}}
-
-
-
-	module.exports=BananaSlugWebNodePresenter;
+	module.exports = BananaSlugWebNodePresenter;
 
 /***/ },
 /* 75 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	module.exports = function setupRNStyle(bridge, agent, resolveRNStyle) {
+	  bridge.onCall('rn-style:get', id => {
+	    var node = agent.elementData.get(id);
+	    if (!node || !node.props) {
+	      return null;
+	    }
+	    return resolveRNStyle(node.props.style);
+	  });
 
+	  bridge.on('rn-style:rename', ({ id, oldName, newName, val }) => {
+	    renameStyle(agent, id, oldName, newName, val);
+	  });
 
+	  bridge.on('rn-style:set', ({ id, attr, val }) => {
+	    setStyle(agent, id, attr, val);
+	  });
+	};
 
+	function shallowClone(obj) {
+	  var nobj = {};
+	  for (var n in obj) {
+	    nobj[n] = obj[n];
+	  }
+	  return nobj;
+	}
 
+	function renameStyle(agent, id, oldName, newName, val) {
+	  var data = agent.elementData.get(id);
+	  var newStyle = { [newName]: val };
+	  if (!data || !data.updater || !data.updater.setInProps) {
+	    var el = agent.reactElements.get(id);
+	    if (el && el.setNativeProps) {
+	      el.setNativeProps(newStyle);
+	    } else {}
+	    return;
+	  }
+	  var style = data && data.props && data.props.style;
+	  var customStyle;
+	  if (Array.isArray(style)) {
+	    if (typeof style[style.length - 1] === 'object' && !Array.isArray(style[style.length - 1])) {
+	      customStyle = shallowClone(style[style.length - 1]);
+	      delete customStyle[oldName];
+	      customStyle[newName] = val;
+	      // $FlowFixMe we know that updater is not null here
+	      data.updater.setInProps(['style', style.length - 1], customStyle);
+	    } else {
+	      style = style.concat([newStyle]);
+	      // $FlowFixMe we know that updater is not null here
+	      data.updater.setInProps(['style'], style);
+	    }
+	  } else {
+	    if (typeof style === 'object') {
+	      customStyle = shallowClone(style);
+	      delete customStyle[oldName];
+	      customStyle[newName] = val;
+	      // $FlowFixMe we know that updater is not null here
+	      data.updater.setInProps(['style'], customStyle);
+	    } else {
+	      style = [style, newStyle];
+	      data.updater.setInProps(['style'], style);
+	    }
+	  }
+	  agent.emit('hideHighlight');
+	}
 
-
-
-
-
-
-
-
-
-	module.exports=function setupRNStyle(bridge,agent,resolveRNStyle){
-	bridge.onCall('rn-style:get',id => {
-	var node=agent.elementData.get(id);
-	if(!node||!node.props){
-	return null;}
-
-	return resolveRNStyle(node.props.style);});
-
-
-	bridge.on('rn-style:rename',({id,oldName,newName,val}) => {
-	renameStyle(agent,id,oldName,newName,val);});
-
-
-	bridge.on('rn-style:set',({id,attr,val}) => {
-	setStyle(agent,id,attr,val);});};
-
-
-
-	function shallowClone(obj){
-	var nobj={};
-	for(var n in obj){
-	nobj[n]=obj[n];}
-
-	return nobj;}
-
-
-	function renameStyle(agent,id,oldName,newName,val){
-	var data=agent.elementData.get(id);
-	var newStyle={[newName]:val};
-	if(!data||!data.updater||!data.updater.setInProps){
-	var el=agent.reactElements.get(id);
-	if(el&&el.setNativeProps){
-	el.setNativeProps(newStyle);}else 
-	{}
-
-
-	return;}
-
-	var style=data&&data.props&&data.props.style;
-	var customStyle;
-	if(Array.isArray(style)){
-	if(typeof style[style.length-1]==='object'&&!Array.isArray(style[style.length-1])){
-	customStyle=shallowClone(style[style.length-1]);
-	delete customStyle[oldName];
-	customStyle[newName]=val;
-
-	data.updater.setInProps(['style',style.length-1],customStyle);}else 
-	{
-	style=style.concat([newStyle]);
-
-	data.updater.setInProps(['style'],style);}}else 
-
-	{
-	if(typeof style==='object'){
-	customStyle=shallowClone(style);
-	delete customStyle[oldName];
-	customStyle[newName]=val;
-
-	data.updater.setInProps(['style'],customStyle);}else 
-	{
-	style=[style,newStyle];
-	data.updater.setInProps(['style'],style);}}
-
-
-	agent.emit('hideHighlight');}
-
-
-	function setStyle(agent,id,attr,val){
-	var data=agent.elementData.get(id);
-	var newStyle={[attr]:val};
-	if(!data||!data.updater||!data.updater.setInProps){
-	var el=agent.reactElements.get(id);
-	if(el&&el.setNativeProps){
-	el.setNativeProps(newStyle);}else 
-	{}
-
-
-	return;}
-
-	var style=data.props&&data.props.style;
-	if(Array.isArray(style)){
-	if(typeof style[style.length-1]==='object'&&!Array.isArray(style[style.length-1])){
-
-	data.updater.setInProps(['style',style.length-1,attr],val);}else 
-	{
-	style=style.concat([newStyle]);
-
-	data.updater.setInProps(['style'],style);}}else 
-
-	{
-	style=[style,newStyle];
-	data.updater.setInProps(['style'],style);}
-
-	agent.emit('hideHighlight');}
+	function setStyle(agent, id, attr, val) {
+	  var data = agent.elementData.get(id);
+	  var newStyle = { [attr]: val };
+	  if (!data || !data.updater || !data.updater.setInProps) {
+	    var el = agent.reactElements.get(id);
+	    if (el && el.setNativeProps) {
+	      el.setNativeProps(newStyle);
+	    } else {}
+	    return;
+	  }
+	  var style = data.props && data.props.style;
+	  if (Array.isArray(style)) {
+	    if (typeof style[style.length - 1] === 'object' && !Array.isArray(style[style.length - 1])) {
+	      // $FlowFixMe we know that updater is not null here
+	      data.updater.setInProps(['style', style.length - 1, attr], val);
+	    } else {
+	      style = style.concat([newStyle]);
+	      // $FlowFixMe we know that updater is not null here
+	      data.updater.setInProps(['style'], style);
+	    }
+	  } else {
+	    style = [style, newStyle];
+	    data.updater.setInProps(['style'], style);
+	  }
+	  agent.emit('hideHighlight');
+	}
 
 /***/ },
 /* 76 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	function decorate(obj, attr, fn) {
+	  var old = obj[attr];
+	  obj[attr] = function () {
+	    var res = old.apply(this, arguments);
+	    fn.apply(this, arguments);
+	    return res;
+	  };
+	  return () => {
+	    obj[attr] = old;
+	  };
+	}
 
+	let subscriptionEnabled = false;
 
+	module.exports = (bridge, agent, hook) => {
+	  var shouldEnable = !!hook._relayInternals;
 
+	  bridge.onCall('relay:check', () => shouldEnable);
+	  if (!shouldEnable) {
+	    return;
+	  }
+	  var {
+	    DefaultStoreData,
+	    setRequestListener
+	  } = hook._relayInternals;
 
+	  function sendStoreData() {
+	    if (subscriptionEnabled) {
+	      bridge.send('relay:store', {
+	        id: 'relay:store',
+	        nodes: DefaultStoreData.getNodeData()
+	      });
+	    }
+	  }
 
+	  bridge.onCall('relay:store:enable', () => {
+	    subscriptionEnabled = true;
+	    sendStoreData();
+	  });
 
+	  bridge.onCall('relay:store:disable', () => {
+	    subscriptionEnabled = false;
+	  });
 
+	  sendStoreData();
+	  decorate(DefaultStoreData, 'handleUpdatePayload', sendStoreData);
+	  decorate(DefaultStoreData, 'handleQueryPayload', sendStoreData);
 
-
-
-
-
-
-	function decorate(obj,attr,fn){
-	var old=obj[attr];
-	obj[attr]=function(){
-	var res=old.apply(this,arguments);
-	fn.apply(this,arguments);
-	return res;};
-
-	return () => {
-	obj[attr]=old;};}
-
-
-
-	let subscriptionEnabled=false;
-
-	module.exports=(bridge,agent,hook) => {
-	var shouldEnable=!!hook._relayInternals;
-
-	bridge.onCall('relay:check',() => shouldEnable);
-	if(!shouldEnable){
-	return;}
-
-	var {
-	DefaultStoreData,
-	setRequestListener}=
-	hook._relayInternals;
-
-	function sendStoreData(){
-	if(subscriptionEnabled){
-	bridge.send('relay:store',{
-	id:'relay:store',
-	nodes:DefaultStoreData.getNodeData()});}}
-
-
-
-
-	bridge.onCall('relay:store:enable',() => {
-	subscriptionEnabled=true;
-	sendStoreData();});
-
-
-	bridge.onCall('relay:store:disable',() => {
-	subscriptionEnabled=false;});
-
-
-	sendStoreData();
-	decorate(DefaultStoreData,'handleUpdatePayload',sendStoreData);
-	decorate(DefaultStoreData,'handleQueryPayload',sendStoreData);
-
-	var removeListener=setRequestListener((event,data) => {
-	bridge.send(event,data);});
-
-	hook.on('shutdown',removeListener);};
+	  var removeListener = setRequestListener((event, data) => {
+	    bridge.send(event, data);
+	  });
+	  hook.on('shutdown', removeListener);
+	};
 
 /***/ },
 /* 77 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	function guid() {
+	  return 'g' + Math.random().toString(16).substr(2);
+	}
 
-
-
-
-
-
-
-
-
-
-	function guid(){
-	return 'g'+Math.random().toString(16).substr(2);}
-
-
-	module.exports=guid;
+	module.exports = guid;
 
 /***/ },
 /* 78 */

@@ -44,147 +44,145 @@
 /* 0 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);var _stringify=__webpack_require__(102);var _stringify2=_interopRequireDefault(_stringify);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	/* global chrome */
 
+	var _extends2 = __webpack_require__(21);
 
+	var _extends3 = _interopRequireDefault(_extends2);
 
+	var _stringify = __webpack_require__(102);
 
+	var _stringify2 = _interopRequireDefault(_stringify);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var checkForReact = __webpack_require__(160);
+	var inject = __webpack_require__(183);
 
-
-
-
-
-
-	var checkForReact=__webpack_require__(160);
-	var inject=__webpack_require__(183);
-
-
-
-	var config={
-	reload,
-	checkForReact,
-	alreadyFoundReact:false,
-	reloadSubscribe(reloadFn){
-	chrome.devtools.network.onNavigated.addListener(reloadFn);
-	return () => {
-	chrome.devtools.network.onNavigated.removeListener(reloadFn);};},
-
-
-	getNewSelection(bridge){
-	chrome.devtools.inspectedWindow.eval('window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$0 = $0');
-	bridge.send('checkSelection');},
-
-	selectElement(id,bridge){
-	bridge.send('putSelectedNode',id);
-	setTimeout(() => {
-	chrome.devtools.inspectedWindow.eval('inspect(window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node)');},
-	100);},
-
-	showComponentSource(vbl){
-
-
-	var code=`Object.getOwnPropertyDescriptor(window.${ vbl }.__proto__.__proto__, 'isMounted') &&
+	var config = {
+	  reload,
+	  checkForReact,
+	  alreadyFoundReact: false,
+	  reloadSubscribe(reloadFn) {
+	    chrome.devtools.network.onNavigated.addListener(reloadFn);
+	    return () => {
+	      chrome.devtools.network.onNavigated.removeListener(reloadFn);
+	    };
+	  },
+	  getNewSelection(bridge) {
+	    chrome.devtools.inspectedWindow.eval('window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$0 = $0');
+	    bridge.send('checkSelection');
+	  },
+	  selectElement(id, bridge) {
+	    bridge.send('putSelectedNode', id);
+	    setTimeout(() => {
+	      chrome.devtools.inspectedWindow.eval('inspect(window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node)');
+	    }, 100);
+	  },
+	  showComponentSource(vbl) {
+	    // if it is an es6 class-based component, (isMounted throws), then inspect
+	    // the constructor. Otherwise, inspect the render function.
+	    var code = `Object.getOwnPropertyDescriptor(window.${ vbl }.__proto__.__proto__, 'isMounted') &&
 	      Object.getOwnPropertyDescriptor(window.${ vbl }.__proto__.__proto__, 'isMounted').value ?
 	        inspect(window.${ vbl }.render) : inspect(window.${ vbl }.constructor)`;
-	chrome.devtools.inspectedWindow.eval(code,(res,err) => {
-	if(err){}});},
+	    chrome.devtools.inspectedWindow.eval(code, (res, err) => {
+	      if (err) {}
+	    });
+	  },
+	  showAttrSource(path) {
+	    var attrs = '[' + path.map(m => (0, _stringify2.default)(m)).join('][') + ']';
+	    var code = 'inspect(window.$r' + attrs + ')';
+	    chrome.devtools.inspectedWindow.eval(code, (res, err) => {
+	      if (err) {}
+	    });
+	  },
+	  executeFn(path) {
+	    var attrs = '[' + path.map(m => (0, _stringify2.default)(m)).join('][') + ']';
+	    var code = 'window.$r' + attrs + '()';
+	    chrome.devtools.inspectedWindow.eval(code, (res, err) => {
+	      if (err) {}
+	    });
+	  },
+	  getURL(src, done) {
+	    var code = 'global.__REACT_DEVTOOLS_GLOBAL_HOOK__.path';
+	    chrome.devtools.inspectedWindow.eval(code, (res, err) => {
+	      if (err) {}
+	      done(res + '/' + src);
+	    });
+	  },
+	  inject(done) {
+	    this.getURL('build/backend.js', source => {
+	      inject(source, () => {
+	        var disconnected = false;
+	        var wall = {
+	          listen(fn) {
+	            setInterval(function () {
+	              chrome.devtools.inspectedWindow.eval('global.__REACT_DEVTOOLS_GLOBAL_HOOK__.receiver()', function (res, err) {
+	                if (res && res.length) {
+	                  fn(res[0].data.payload);
+	                }
+	              });
+	            }, 100);
+	          },
+	          send(data) {
+	            if (disconnected) {
+	              return;
+	            }
 
+	            var packet = (0, _stringify2.default)({
+	              data: {
+	                source: 'react-devtools-content-script',
+	                payload: data
+	              }
+	            });
 
+	            var code = ';\nglobal.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.emit("message", ' + packet + ');';
+	            chrome.devtools.inspectedWindow.eval(code, function (res, err) {
+	              if (err) {
+	                return;
+	              }
 
+	              if (res === false) {}
+	            });
+	          }
+	        };
 
-	showAttrSource(path){
-	var attrs='['+path.map(m => (0,_stringify2.default)(m)).join('][')+']';
-	var code='inspect(window.$r'+attrs+')';
-	chrome.devtools.inspectedWindow.eval(code,(res,err) => {
-	if(err){}});},
+	        done(wall, () => {
+	          // TODO disconnect
+	          // port.disconnect();
+	        });
+	      });
+	    });
+	  }
+	};
 
+	var Panel = __webpack_require__(170);
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
 
+	var node = document.getElementById('container');
 
+	function reload() {
+	  setTimeout(() => {
+	    ReactDOM.unmountComponentAtNode(node);
+	    node.innerHTML = '';
+	    ReactDOM.render(React.createElement(Panel, config), node);
+	  }, 100);
+	}
 
-	executeFn(path){
-	var attrs='['+path.map(m => (0,_stringify2.default)(m)).join('][')+']';
-	var code='window.$r'+attrs+'()';
-	chrome.devtools.inspectedWindow.eval(code,(res,err) => {
-	if(err){}});},
-
-
-
-
-	getURL(src,done){
-	var code='global.__dirname';
-	chrome.devtools.inspectedWindow.eval(code,(res,err) => {
-	if(err){}
-
-
-	done(res+'/node_modules/react-devtron/'+src);});},
-
-
-	inject(done){
-	this.getURL('build/backend.js',source => {
-	_inject(source,function(){
-	var disconnected=false;
-	var wall={
-	listen(fn){
-	setInterval(function(){
-	chrome.devtools.inspectedWindow.eval('global.__react.receives()',function(res,err){
-	if(res&&res.length){
-	fn(res[0].data.payload);}});},
-
-
-	100);},
-
-	send(data){
-	if(disconnected){
-	return;}
-
-
-	var packet=(0,_stringify2.default)({
-	data:{
-	source:'react-devtools-content-script',
-	payload:data}});
-
-
-
-	var code=';\nglobal.__react.emit("message", '+packet+');';
-	chrome.devtools.inspectedWindow.eval(code,function(res,err){
-	if(err){
-	return;}
-
-
-	if(res===false){}});}};
-
-
-
-
-
-
-	done(wall,() => {
-
-	port.disconnect();});});});}};
-
-
-
-
-
-
-	var Panel=__webpack_require__(170);
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-
-	var node=document.getElementById('container');
-
-	function reload(){
-	setTimeout(() => {
-	ReactDOM.unmountComponentAtNode(node);
-	node.innerHTML='';
-	ReactDOM.render(React.createElement(Panel,config),node);},
-	100);}
-
-
-	ReactDOM.render(React.createElement(Panel,(0,_extends3.default)({alreadyFoundReact:true},config)),node);
+	ReactDOM.render(React.createElement(Panel, (0, _extends3.default)({ alreadyFoundReact: true }, config)), node);
 
 /***/ },
 /* 1 */
@@ -634,164 +632,159 @@
 /* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _set=__webpack_require__(200);var _set2=_interopRequireDefault(_set);var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	module.exports=function(options,Component){
-	var storeKey=options.store||'store';
-	class Wrapper extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={};}
-
-
-	componentWillMount(){
-	if(!this.context[storeKey]){
-	return;}
-
-	this._update=() => this.forceUpdate();
-	if(!options.listeners){
-	return undefined;}
-
-	this._listeners=options.listeners(this.props,this.context[storeKey]);
-	this._listeners.forEach(evt => {
-	this.context[storeKey].on(evt,this._update);});}
-
-
-
-	componentWillUnmount(){
-	if(!this.context[storeKey]){
-	return;}
-
-	this._listeners.forEach(evt => {
-	this.context[storeKey].off(evt,this._update);});}
-
-
-
-	shouldComponentUpdate(nextProps,nextState){
-	if(nextState!==this.state){
-	return true;}
-
-	if(options.shouldUpdate){
-	return options.shouldUpdate(nextProps,this.props);}
-
-	return false;}
-
-
-	componentWillUpdate(nextProps,nextState){
-	if(!this.context[storeKey]){
-	return;}
-
-	if(!options.listeners){
-	return undefined;}
-
-	var listeners=options.listeners(this.props,this.context[storeKey]);
-	var diff=arrayDiff(listeners,this._listeners);
-	diff.missing.forEach(name => {
-	this.context[storeKey].off(name,this._update);});
-
-	diff.newItems.forEach(name => {
-	this.context[storeKey].on(name,this._update);});
-
-	this._listeners=listeners;}
-
-
-	render(){
-	var store=this.context[storeKey];
-	var props=store&&options.props(store,this.props);
-	return React.createElement(Component,(0,_extends3.default)({},props,this.props));}}
-
-
-
-	Wrapper.contextTypes={
-	[storeKey]:React.PropTypes.object};
-
-
-	Wrapper.displayName='Wrapper('+Component.name+')';
-
-	return Wrapper;};
-
-
-	function arrayDiff(array,oldArray){
-	var names=new _set2.default();
-	var missing=[];
-	for(var i=0;i<array.length;i++){
-	names.add(array[i]);}
-
-	for(var j=0;j<oldArray.length;j++){
-	if(!names.has(oldArray[j])){
-	missing.push(oldArray[j]);}else 
-	{
-	names.delete(oldArray[j]);}}
-
-
-	return {
-	missing,
-	newItems:setToArray(names)};}
-
-
-
-	function setToArray(set){
-	var res=[];
-	for(var val of set){
-	res.push(val);}
-
-	return res;}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _set = __webpack_require__(200);
+
+	var _set2 = _interopRequireDefault(_set);
+
+	var _extends2 = __webpack_require__(21);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var React = __webpack_require__(3);
+
+	/**
+	 * This Higher Order Component decorator function is the way the components
+	 * communicate with the central Store.
+	 *
+	 * Example:
+	 *
+	 * class MyComp {
+	 *   render() {
+	 *     return (
+	 *       <div>
+	 *         Hello {this.props.name}.
+	 *         <button onClick={this.props.sayHi}>Hi back</button>
+	 *       </div>
+	 *     );
+	 *   }
+	 * }
+	 *
+	 * module.exports = decorate({
+	 *   listeners: () => ['nameChanged'],
+	 *   props(store) {
+	 *     return {
+	 *       name: store.name,
+	 *       sayHi: () => store.sayHi(),
+	 *     };
+	 *   },
+	 * }, MyComp);
+	 */
+	module.exports = function (options, Component) {
+	  var storeKey = options.store || 'store';
+	  class Wrapper extends React.Component {
+
+	    constructor(props) {
+	      super(props);
+	      this.state = {};
+	    }
+
+	    componentWillMount() {
+	      if (!this.context[storeKey]) {
+	        return;
+	      }
+	      this._update = () => this.forceUpdate();
+	      if (!options.listeners) {
+	        return undefined;
+	      }
+	      this._listeners = options.listeners(this.props, this.context[storeKey]);
+	      this._listeners.forEach(evt => {
+	        this.context[storeKey].on(evt, this._update);
+	      });
+	    }
+
+	    componentWillUnmount() {
+	      if (!this.context[storeKey]) {
+	        return;
+	      }
+	      this._listeners.forEach(evt => {
+	        this.context[storeKey].off(evt, this._update);
+	      });
+	    }
+
+	    shouldComponentUpdate(nextProps, nextState) {
+	      if (nextState !== this.state) {
+	        return true;
+	      }
+	      if (options.shouldUpdate) {
+	        return options.shouldUpdate(nextProps, this.props);
+	      }
+	      return false;
+	    }
+
+	    componentWillUpdate(nextProps, nextState) {
+	      if (!this.context[storeKey]) {
+	        return;
+	      }
+	      if (!options.listeners) {
+	        return undefined;
+	      }
+	      var listeners = options.listeners(this.props, this.context[storeKey]);
+	      var diff = arrayDiff(listeners, this._listeners);
+	      diff.missing.forEach(name => {
+	        this.context[storeKey].off(name, this._update);
+	      });
+	      diff.newItems.forEach(name => {
+	        this.context[storeKey].on(name, this._update);
+	      });
+	      this._listeners = listeners;
+	    }
+
+	    render() {
+	      var store = this.context[storeKey];
+	      var props = store && options.props(store, this.props);
+	      return React.createElement(Component, (0, _extends3.default)({}, props, this.props));
+	    }
+	  }
+
+	  Wrapper.contextTypes = {
+	    [storeKey]: React.PropTypes.object
+	  };
+
+	  Wrapper.displayName = 'Wrapper(' + Component.name + ')';
+
+	  return Wrapper;
+	};
+
+	function arrayDiff(array, oldArray) {
+	  var names = new _set2.default();
+	  var missing = [];
+	  for (var i = 0; i < array.length; i++) {
+	    names.add(array[i]);
+	  }
+	  for (var j = 0; j < oldArray.length; j++) {
+	    if (!names.has(oldArray[j])) {
+	      missing.push(oldArray[j]);
+	    } else {
+	      names.delete(oldArray[j]);
+	    }
+	  }
+	  return {
+	    missing,
+	    newItems: setToArray(names)
+	  };
+	}
+
+	function setToArray(set) {
+	  var res = [];
+	  for (var val of set) {
+	    res.push(val);
+	  }
+	  return res;
+	}
 
 /***/ },
 /* 8 */
@@ -1885,26 +1878,27 @@
 /* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var Symbol = __webpack_require__(254);
 
-
-
-
-
-
-
-
-
-
-	var Symbol=__webpack_require__(254);
-
-	module.exports={
-	name:Symbol('name'),
-	type:Symbol('type'),
-	inspected:Symbol('inspected'),
-	meta:Symbol('meta'),
-	proto:Symbol('proto')};
+	module.exports = {
+	  name: Symbol('name'),
+	  type: Symbol('type'),
+	  inspected: Symbol('inspected'),
+	  meta: Symbol('meta'),
+	  proto: Symbol('proto')
+	};
 
 /***/ },
 /* 21 */
@@ -3248,62 +3242,57 @@
 /* 41 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright 2013-2015, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * TODO: this is copied from fbjs because fbjs doesn't play well with
+	 * non-haste module systems :/. Look into how to fix this.
+	 */
 	'use strict';
 
+	/**
+	 * Use invariant() to assert state which your program assumes to be true.
+	 *
+	 * Provide sprintf-style format (only %s is supported) and arguments
+	 * to provide information about what broke and what you were
+	 * expecting.
+	 *
+	 * The invariant message will be stripped in production, but the invariant
+	 * will remain to ensure logic does not differ in production.
+	 */
 
+	var __DEV__ = ("production") === 'development';
 
+	var invariant = function invariant(condition, format, a, b, c, d, e, f) {
+	  if (__DEV__) {
+	    if (format === undefined) {
+	      throw new Error('invariant requires an error message argument');
+	    }
+	  }
 
+	  if (!condition) {
+	    var error;
+	    if (format === undefined) {
+	      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
+	    } else {
+	      var args = [a, b, c, d, e, f];
+	      var argIndex = 0;
+	      error = new Error('Invariant Violation: ' + format.replace(/%s/g, function () {
+	        return args[argIndex++];
+	      }));
+	    }
 
+	    error.framesToPop = 1; // we don't care about invariant's own frame
+	    throw error;
+	  }
+	};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	var __DEV__=("production")==='development';
-
-	var invariant=function invariant(condition,format,a,b,c,d,e,f){
-	if(__DEV__){
-	if(format===undefined){
-	throw new Error('invariant requires an error message argument');}}
-
-
-
-	if(!condition){
-	var error;
-	if(format===undefined){
-	error=new Error(
-	'Minified exception occurred; use the non-minified dev environment '+
-	'for the full error message and additional helpful warnings.');}else 
-
-	{
-	var args=[a,b,c,d,e,f];
-	var argIndex=0;
-	error=new Error(
-	'Invariant Violation: '+
-	format.replace(/%s/g,function(){
-	return args[argIndex++];}));}
-
-
-
-
-	error.framesToPop=1;
-	throw error;}};
-
-
-
-	module.exports=invariant;
+	module.exports = invariant;
 
 /***/ },
 /* 42 */
@@ -4506,53 +4495,55 @@
 /* 59 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	module.exports = {
+	  func: {
+	    color: 'rgb(37, 153, 37)'
+	  },
 
+	  attr: {},
 
+	  object: {
+	    color: 'rgb(232, 98, 0)'
+	  },
 
+	  array: {
+	    color: 'rgb(0, 154, 190)'
+	  },
 
+	  symbol: {
+	    color: 'rgb(232, 98, 0)'
+	  },
 
+	  number: {
+	    color: 'rgb(255, 0, 252)'
+	  },
 
+	  string: {
+	    color: 'rgb(0, 49, 205)',
+	    wordBreak: 'break-word'
+	  },
 
+	  bool: {
+	    color: 'rgb(0, 187, 255)'
+	  },
 
+	  empty: {
+	    color: '#777'
+	  }
 
-
-	module.exports={
-	func:{
-	color:'rgb(37, 153, 37)'},
-
-
-	attr:{},
-
-
-	object:{
-	color:'rgb(232, 98, 0)'},
-
-
-	array:{
-	color:'rgb(0, 154, 190)'},
-
-
-	symbol:{
-	color:'rgb(232, 98, 0)'},
-
-
-	number:{
-	color:'rgb(255, 0, 252)'},
-
-
-	string:{
-	color:'rgb(0, 49, 205)',
-	wordBreak:'break-word'},
-
-
-	bool:{
-	color:'rgb(0, 187, 255)'},
-
-
-	empty:{
-	color:'#777'}};
+	};
 
 /***/ },
 /* 60 */
@@ -12106,561 +12097,544 @@
 /* 97 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(36);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var Simple=__webpack_require__(165);
-
-	var assign=__webpack_require__(2);
-	var consts=__webpack_require__(20);
-	var previewComplex=__webpack_require__(166);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class DataView extends React.Component{
-
-
-	render(){
-	var data=this.props.data;
-	if(!data){
-	return React.createElement('div',{style:styles.missing},'null');}
-
-	var names=(0,_keys2.default)(data);
-	if(!this.props.noSort){
-	names.sort(alphanumericSort);}
-
-	var path=this.props.path;
-	if(!names.length){
-	return (
-	React.createElement('span',{style:styles.empty},
-	Array.isArray(data)?'Empty array':'Empty object'));}
-
-
-
-
-	return (
-	React.createElement('ul',{style:styles.container},
-	data[consts.proto]&&
-	React.createElement(DataItem,{
-	name:'__proto__',
-	path:path.concat(['__proto__']),
-	key:'__proto__',
-	startOpen:this.props.startOpen,
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	readOnly:this.props.readOnly,
-	value:this.props.data[consts.proto]}),
-
-
-	names.map((name,i) => 
-	React.createElement(DataItem,{
-	name:name,
-	path:path.concat([name]),
-	key:name,
-	startOpen:this.props.startOpen,
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	readOnly:this.props.readOnly,
-	value:this.props.data[name]}))));}}
-
-
-
-
-
-
-
-	class DataItem extends React.Component{
-
-
-
-
-
-
-
-
-
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={open:!!this.props.startOpen,loading:false};}
-
-
-	componentDidMount(){
-	if(this.state.open&&this.props.value&&this.props.value[consts.inspected]===false){
-	this.inspect();}}
-
-
-
-	componentWillReceiveProps(nextProps){
-	if(this.state.open&&nextProps.value&&nextProps.value[consts.inspected]===false){
-	this.inspect();}}
-
-
-
-	inspect(){
-	this.setState({loading:true,open:true});
-	this.props.inspect(this.props.path,() => {
-	this.setState({loading:false});});}
-
-
-
-	toggleOpen(){
-	if(this.state.loading){
-	return;}
-
-	if(this.props.value&&this.props.value[consts.inspected]===false){
-	this.inspect();
-	return;}
-
-
-	this.setState({
-	open:!this.state.open});}
-
-
-
-	render(){
-	var data=this.props.value;
-	var otype=typeof data;
-
-	var complex=true;
-	var preview;
-	if(otype==='number'||otype==='string'||data==null||otype==='boolean'){
-	preview=
-	React.createElement(Simple,{
-	readOnly:this.props.readOnly,
-	path:this.props.path,
-	data:data});
-
-
-	complex=false;}else 
-	{
-	preview=previewComplex(data);}
-
-
-	var open=this.state.open&&(!data||data[consts.inspected]!==false);
-
-	var opener=null;
-	if(complex){
-	opener=
-	React.createElement('div',{
-	onClick:this.toggleOpen.bind(this),
-	style:styles.opener},
-	open?React.createElement('span',null,'▼'):React.createElement('span',null,'▶'));}
-
-
-
-
-	var children=null;
-	if(complex&&open){
-
-	children=
-	React.createElement('div',{style:styles.children},
-	React.createElement(DataView,{
-	data:this.props.value,
-	path:this.props.path,
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	readOnly:this.props.readOnly}));}
-
-
-
-
-
-	var name=this.props.name;
-	if(name.length>50){
-	name=name.slice(0,50)+'…';}
-
-
-	return (
-	React.createElement('li',null,
-	React.createElement('div',{style:styles.head},
-	opener,
-	React.createElement('div',{
-	style:assign({},styles.name,complex&&styles.complexName),
-	onClick:this.toggleOpen.bind(this)},
-
-	this.props.name,':'),
-
-	React.createElement('div',{
-	onContextMenu:e => {
-	if(typeof this.props.showMenu==='function'){
-	return this.props.showMenu(e,this.props.value,this.props.path,this.props.name);}},
-
-
-	style:styles.preview},
-
-	preview)),
-
-
-	children));}}
-
-
-
-
-
-	function alphanumericSort(a,b){
-	if(''+ +a===a){
-	if(''+ +b!==b){
-	return -1;}
-
-	return +a<+b?-1:1;}
-
-	return a<b?-1:1;}
-
-
-	var styles={
-	container:{
-	listStyle:'none',
-	margin:0,
-	padding:0,
-	marginLeft:10},
-
-
-	children:{},
-
-
-	empty:{
-	fontSize:12,
-	marginLeft:20,
-	padding:'2px 5px',
-	color:'#aaa'},
-
-
-	missing:{
-	fontSize:12,
-	fontWeight:'bold',
-	marginLeft:20,
-	padding:'2px 5px',
-	color:'#888'},
-
-
-	opener:{
-	fontSize:8,
-	cursor:'pointer',
-	position:'absolute',
-	right:'100%',
-	padding:'5px 0'},
-
-
-	head:{
-	display:'flex',
-	position:'relative'},
-
-
-	name:{
-	color:'#666',
-	margin:'2px 3px'},
-
-
-	complexName:{
-	cursor:'pointer'},
-
-
-	preview:{
-	display:'flex',
-	margin:'2px 3px',
-	whiteSpace:'pre',
-	wordBreak:'break-word',
-	flex:1},
-
-
-	value:{}};
-
-
-
-	module.exports=DataView;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _keys = __webpack_require__(36);
+
+	var _keys2 = _interopRequireDefault(_keys);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var React = __webpack_require__(3);
+	var Simple = __webpack_require__(165);
+
+	var assign = __webpack_require__(2);
+	var consts = __webpack_require__(20);
+	var previewComplex = __webpack_require__(166);
+
+	class DataView extends React.Component {
+
+	  render() {
+	    var data = this.props.data;
+	    if (!data) {
+	      return React.createElement(
+	        'div',
+	        { style: styles.missing },
+	        'null'
+	      );
+	    }
+	    var names = (0, _keys2.default)(data);
+	    if (!this.props.noSort) {
+	      names.sort(alphanumericSort);
+	    }
+	    var path = this.props.path;
+	    if (!names.length) {
+	      return React.createElement(
+	        'span',
+	        { style: styles.empty },
+	        Array.isArray(data) ? 'Empty array' : 'Empty object'
+	      );
+	    }
+
+	    return React.createElement(
+	      'ul',
+	      { style: styles.container },
+	      data[consts.proto] && React.createElement(DataItem, {
+	        name: '__proto__',
+	        path: path.concat(['__proto__']),
+	        key: '__proto__',
+	        startOpen: this.props.startOpen,
+	        inspect: this.props.inspect,
+	        showMenu: this.props.showMenu,
+	        readOnly: this.props.readOnly,
+	        value: this.props.data[consts.proto]
+	      }),
+	      names.map((name, i) => React.createElement(DataItem, {
+	        name: name,
+	        path: path.concat([name]),
+	        key: name,
+	        startOpen: this.props.startOpen,
+	        inspect: this.props.inspect,
+	        showMenu: this.props.showMenu,
+	        readOnly: this.props.readOnly,
+	        value: this.props.data[name]
+	      }))
+	    );
+	  }
+	}
+
+	class DataItem extends React.Component {
+
+	  constructor(props) {
+	    super(props);
+	    this.state = { open: !!this.props.startOpen, loading: false };
+	  }
+
+	  componentDidMount() {
+	    if (this.state.open && this.props.value && this.props.value[consts.inspected] === false) {
+	      this.inspect();
+	    }
+	  }
+
+	  componentWillReceiveProps(nextProps) {
+	    if (this.state.open && nextProps.value && nextProps.value[consts.inspected] === false) {
+	      this.inspect();
+	    }
+	  }
+
+	  inspect() {
+	    this.setState({ loading: true, open: true });
+	    this.props.inspect(this.props.path, () => {
+	      this.setState({ loading: false });
+	    });
+	  }
+
+	  toggleOpen() {
+	    if (this.state.loading) {
+	      return;
+	    }
+	    if (this.props.value && this.props.value[consts.inspected] === false) {
+	      this.inspect();
+	      return;
+	    }
+
+	    this.setState({
+	      open: !this.state.open
+	    });
+	  }
+
+	  render() {
+	    var data = this.props.value;
+	    var otype = typeof data;
+
+	    var complex = true;
+	    var preview;
+	    if (otype === 'number' || otype === 'string' || data == null /* null or undefined */ || otype === 'boolean') {
+	      preview = React.createElement(Simple, {
+	        readOnly: this.props.readOnly,
+	        path: this.props.path,
+	        data: data
+	      });
+	      complex = false;
+	    } else {
+	      preview = previewComplex(data);
+	    }
+
+	    var open = this.state.open && (!data || data[consts.inspected] !== false);
+
+	    var opener = null;
+	    if (complex) {
+	      opener = React.createElement(
+	        'div',
+	        {
+	          onClick: this.toggleOpen.bind(this),
+	          style: styles.opener },
+	        open ? React.createElement(
+	          'span',
+	          null,
+	          '▼'
+	        ) : React.createElement(
+	          'span',
+	          null,
+	          '▶'
+	        )
+	      );
+	    }
+
+	    var children = null;
+	    if (complex && open) {
+	      // TODO path
+	      children = React.createElement(
+	        'div',
+	        { style: styles.children },
+	        React.createElement(DataView, {
+	          data: this.props.value,
+	          path: this.props.path,
+	          inspect: this.props.inspect,
+	          showMenu: this.props.showMenu,
+	          readOnly: this.props.readOnly
+	        })
+	      );
+	    }
+
+	    var name = this.props.name;
+	    if (name.length > 50) {
+	      name = name.slice(0, 50) + '…';
+	    }
+
+	    return React.createElement(
+	      'li',
+	      null,
+	      React.createElement(
+	        'div',
+	        { style: styles.head },
+	        opener,
+	        React.createElement(
+	          'div',
+	          {
+	            style: assign({}, styles.name, complex && styles.complexName),
+	            onClick: this.toggleOpen.bind(this)
+	          },
+	          this.props.name,
+	          ':'
+	        ),
+	        React.createElement(
+	          'div',
+	          {
+	            onContextMenu: e => {
+	              if (typeof this.props.showMenu === 'function') {
+	                return this.props.showMenu(e, this.props.value, this.props.path, this.props.name);
+	              }
+	            },
+	            style: styles.preview
+	          },
+	          preview
+	        )
+	      ),
+	      children
+	    );
+	  }
+	}
+
+	function alphanumericSort(a, b) {
+	  if ('' + +a === a) {
+	    if ('' + +b !== b) {
+	      return -1;
+	    }
+	    return +a < +b ? -1 : 1;
+	  }
+	  return a < b ? -1 : 1;
+	}
+
+	var styles = {
+	  container: {
+	    listStyle: 'none',
+	    margin: 0,
+	    padding: 0,
+	    marginLeft: 10
+	  },
+
+	  children: {},
+
+	  empty: {
+	    fontSize: 12,
+	    marginLeft: 20,
+	    padding: '2px 5px',
+	    color: '#aaa'
+	  },
+
+	  missing: {
+	    fontSize: 12,
+	    fontWeight: 'bold',
+	    marginLeft: 20,
+	    padding: '2px 5px',
+	    color: '#888'
+	  },
+
+	  opener: {
+	    fontSize: 8,
+	    cursor: 'pointer',
+	    position: 'absolute',
+	    right: '100%',
+	    padding: '5px 0'
+	  },
+
+	  head: {
+	    display: 'flex',
+	    position: 'relative'
+	  },
+
+	  name: {
+	    color: '#666',
+	    margin: '2px 3px'
+	  },
+
+	  complexName: {
+	    cursor: 'pointer'
+	  },
+
+	  preview: {
+	    display: 'flex',
+	    margin: '2px 3px',
+	    whiteSpace: 'pre',
+	    wordBreak: 'break-word',
+	    flex: 1
+	  },
+
+	  value: {}
+	};
+
+	module.exports = DataView;
 
 /***/ },
 /* 98 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
+	var Draggable = __webpack_require__(167);
 
+	var assign = __webpack_require__(2);
 
+	class SplitPane extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	      moving: false,
+	      width: props.initialWidth
+	    };
+	  }
 
+	  onMove(x) {
+	    var node = ReactDOM.findDOMNode(this);
+	    this.setState({
+	      width: node.offsetLeft + node.offsetWidth - x
+	    });
+	  }
 
+	  render() {
+	    var dragStyle = styles.dragger;
+	    if (this.state.moving) {
+	      dragStyle = assign({}, dragStyle, styles.draggerMoving);
+	    }
+	    var rightStyle = assign({}, styles.rightPane, {
+	      width: this.state.width
+	    });
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(
+	        'div',
+	        { style: styles.leftPane },
+	        this.props.left()
+	      ),
+	      React.createElement(Draggable, {
+	        style: dragStyle,
+	        onStart: () => this.setState({ moving: true }),
+	        onMove: x => this.onMove(x),
+	        onStop: () => this.setState({ moving: false })
+	      }),
+	      React.createElement(
+	        'div',
+	        { style: rightStyle },
+	        this.props.right()
+	      )
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    display: 'flex',
+	    minWidth: 0,
+	    flex: 1
+	  },
 
+	  dragger: {
+	    cursor: 'ew-resize',
+	    borderWidth: '0 5px',
+	    backgroundColor: '#ccc',
+	    width: 1,
+	    borderStyle: 'solid',
+	    borderColor: 'white'
+	  },
 
+	  draggerMoving: {
+	    backgroundColor: '#aaf'
+	  },
 
+	  rightPane: {
+	    display: 'flex'
+	  },
 
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-	var Draggable=__webpack_require__(167);
+	  leftPane: {
+	    display: 'flex',
+	    minWidth: 0,
+	    flex: 1
+	  }
+	};
 
-	var assign=__webpack_require__(2);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class SplitPane extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={
-	moving:false,
-	width:props.initialWidth};}
-
-
-
-	onMove(x){
-	var node=ReactDOM.findDOMNode(this);
-	this.setState({
-	width:node.offsetLeft+node.offsetWidth-x});}
-
-
-
-	render(){
-	var dragStyle=styles.dragger;
-	if(this.state.moving){
-	dragStyle=assign({},dragStyle,styles.draggerMoving);}
-
-	var rightStyle=assign({},styles.rightPane,{
-	width:this.state.width});
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('div',{style:styles.leftPane},
-	this.props.left()),
-
-	React.createElement(Draggable,{
-	style:dragStyle,
-	onStart:() => this.setState({moving:true}),
-	onMove:x => this.onMove(x),
-	onStop:() => this.setState({moving:false})}),
-
-	React.createElement('div',{style:rightStyle},
-	this.props.right())));}}
-
-
-
-
-
-
-	var styles={
-	container:{
-	display:'flex',
-	minWidth:0,
-	flex:1},
-
-
-	dragger:{
-	cursor:'ew-resize',
-	borderWidth:'0 5px',
-	backgroundColor:'#ccc',
-	width:1,
-	borderStyle:'solid',
-	borderColor:'white'},
-
-
-	draggerMoving:{
-	backgroundColor:'#aaf'},
-
-
-	rightPane:{
-	display:'flex'},
-
-
-	leftPane:{
-	display:'flex',
-	minWidth:0,
-	flex:1}};
-
-
-
-	module.exports=SplitPane;
+	module.exports = SplitPane;
 
 /***/ },
 /* 99 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
+	class DetailPane extends React.Component {
 
+	  render() {
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(
+	        'div',
+	        { style: styles.header },
+	        React.createElement(
+	          'span',
+	          { style: styles.headerName },
+	          this.props.header
+	        ),
+	        React.createElement(
+	          'span',
+	          { style: styles.consoleHint },
+	          this.props.hint
+	        )
+	      ),
+	      this.props.children
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    padding: 3,
+	    fontSize: '11px',
+	    // TODO figure out what font Chrome devtools uses on Windows
+	    fontFamily: 'Menlo, Consolas, monospace',
+	    overflow: 'auto',
+	    flex: 1,
+	    display: 'flex',
+	    flexDirection: 'column',
 
+	    cursor: 'default',
+	    WebkitUserSelect: 'none',
+	    MozUserSelect: 'none',
+	    userSelect: 'none'
+	  },
+	  header: {
+	    flexShrink: 0
+	  },
+	  headerName: {
+	    flex: 1,
+	    fontSize: 16,
+	    color: 'rgb(184, 0, 161)',
 
+	    cursor: 'text',
+	    WebkitUserSelect: 'text',
+	    MozUserSelect: 'text',
+	    userSelect: 'text'
+	  },
+	  consoleHint: {
+	    float: 'right',
+	    fontSize: 11
+	  }
+	};
 
-
-
-
-
-	var React=__webpack_require__(3);
-
-	class DetailPane extends React.Component{
-
-	render(){
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('div',{style:styles.header},
-	React.createElement('span',{style:styles.headerName},
-	this.props.header),
-
-	React.createElement('span',{style:styles.consoleHint},this.props.hint)),
-
-	this.props.children));}}
-
-
-
-
-
-	var styles={
-	container:{
-	padding:3,
-	fontSize:'11px',
-
-	fontFamily:'Menlo, Consolas, monospace',
-	overflow:'auto',
-	flex:1,
-	display:'flex',
-	flexDirection:'column',
-
-	cursor:'default',
-	WebkitUserSelect:'none',
-	MozUserSelect:'none',
-	userSelect:'none'},
-
-	header:{
-	flexShrink:0},
-
-	headerName:{
-	flex:1,
-	fontSize:16,
-	color:'rgb(184, 0, 161)',
-
-	cursor:'text',
-	WebkitUserSelect:'text',
-	MozUserSelect:'text',
-	userSelect:'text'},
-
-	consoleHint:{
-	float:'right',
-	fontSize:11}};
-
-
-
-	module.exports=DetailPane;
+	module.exports = DetailPane;
 
 /***/ },
 /* 100 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
+	class DetailPaneSection extends React.Component {
+	  render() {
+	    var {
+	      children,
+	      hint
+	    } = this.props;
+	    return React.createElement(
+	      'div',
+	      { style: styles.section },
+	      React.createElement(
+	        'strong',
+	        null,
+	        this.props.title
+	      ),
+	      hint ? ' ' + hint : null,
+	      children
+	    );
+	  }
+	}
 
+	var styles = {
+	  section: {
+	    marginBottom: 10,
+	    flexShrink: 0
+	  }
+	};
 
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-
-	class DetailPaneSection extends React.Component{
-	render(){
-	var {
-	children,
-	hint}=
-	this.props;
-	return (
-	React.createElement('div',{style:styles.section},
-	React.createElement('strong',null,this.props.title),
-	hint?' '+hint:null,
-	children));}}
-
-
-
-
-
-	var styles={
-	section:{
-	marginBottom:10,
-	flexShrink:0}};
-
-
-
-	module.exports=DetailPaneSection;
+	module.exports = DetailPaneSection;
 
 /***/ },
 /* 101 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * Flash the background of a dom node to a different color and then fade back
+	 * to a base color.
+	 *
+	 *
+	 */
 	'use strict';
 
+	function flash(node, flashColor, baseColor, duration) {
+	  node.style.transition = 'none';
+	  node.style.backgroundColor = flashColor;
+	  // force recalc
+	  void node.offsetTop;
+	  node.style.transition = `background-color ${ duration }s ease`;
+	  node.style.backgroundColor = baseColor;
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	function flash(node,flashColor,baseColor,duration){
-	node.style.transition='none';
-	node.style.backgroundColor=flashColor;
-
-	void node.offsetTop;
-	node.style.transition=`background-color ${ duration }s ease`;
-	node.style.backgroundColor=baseColor;}
-
-
-	module.exports=flash;
+	module.exports = flash;
 
 /***/ },
 /* 102 */
@@ -17531,3790 +17505,3759 @@
 /* 156 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _getOwnPropertyNames=__webpack_require__(199);var _getOwnPropertyNames2=_interopRequireDefault(_getOwnPropertyNames);var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);var _map=__webpack_require__(197);var _map2=_interopRequireDefault(_map);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var consts=__webpack_require__(20);
-	var hydrate=__webpack_require__(158);
-	var dehydrate=__webpack_require__(157);
-	var performanceNow=__webpack_require__(126);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Bridge{
-
-
-
-
-
-
-
-
-
-
-
-	constructor(wall){
-	this._cbs=new _map2.default();
-	this._inspectables=new _map2.default();
-	this._cid=0;
-	this._listeners={};
-	this._buffer=[];
-	this._waiting=null;
-	this._lastTime=5;
-	this._callers={};
-	this._paused=false;
-	this._wall=wall;
-
-	wall.listen(this._handleMessage.bind(this));}
-
-
-	inspect(id,path,cb){
-	var _cid=this._cid++;
-	this._cbs.set(_cid,(data,cleaned,proto,protoclean) => {
-	if(cleaned.length){
-	hydrate(data,cleaned);}
-
-	if(proto&&protoclean.length){
-	hydrate(proto,protoclean);}
-
-	if(proto){
-	data[consts.proto]=proto;}
-
-	cb(data);});
-
-
-	this._wall.send({
-	type:'inspect',
-	callback:_cid,
-	path,
-	id});}
-
-
-
-	call(name,args,cb){
-	var _cid=this._cid++;
-	this._cbs.set(_cid,cb);
-
-	this._wall.send({
-	type:'call',
-	callback:_cid,
-	args,
-	name});}
-
-
-
-	onCall(name,handler){
-	if(this._callers[name]){
-	throw new Error('only one call handler per call name allowed');}
-
-	this._callers[name]=handler;}
-
-
-	pause(){
-	this._wall.send({
-	type:'pause'});}
-
-
-
-	resume(){
-	this._wall.send({
-	type:'resume'});}
-
-
-
-	setInspectable(id,data){
-	var prev=this._inspectables.get(id);
-	if(!prev){
-	this._inspectables.set(id,data);
-	return;}
-
-	this._inspectables.set(id,(0,_extends3.default)({},prev,data));}
-
-
-	sendOne(evt,data){
-	var cleaned=[];
-	var san=dehydrate(data,cleaned);
-	if(cleaned.length){
-	this.setInspectable(data.id,data);}
-
-	this._wall.send({type:'event',evt,data:san,cleaned});}
-
-
-	send(evt,data){
-	if(!this._waiting&&!this._paused){
-	this._buffer=[];
-	var nextTime=this._lastTime*3;
-	if(nextTime>500){
-
-	nextTime=500;}
-
-	this._waiting=setTimeout(() => {
-	this.flush();
-	this._waiting=null;},
-	nextTime);}
-
-	this._buffer.push({evt,data});}
-
-
-	flush(){
-	var start=performanceNow();
-	var events=this._buffer.map(({evt,data}) => {
-	var cleaned=[];
-	var san=dehydrate(data,cleaned);
-	if(cleaned.length){
-	this.setInspectable(data.id,data);}
-
-	return {type:'event',evt,data:san,cleaned};});
-
-	this._wall.send({type:'many-events',events});
-	this._buffer=[];
-	this._waiting=null;
-	this._lastTime=performanceNow()-start;}
-
-
-	forget(id){
-	this._inspectables.delete(id);}
-
-
-	on(evt,fn){
-	if(!this._listeners[evt]){
-	this._listeners[evt]=[fn];}else 
-	{
-	this._listeners[evt].push(fn);}}
-
-
-
-	off(evt,fn){
-	if(!this._listeners[evt]){
-	return;}
-
-	var ix=this._listeners[evt].indexOf(fn);
-	if(ix!==-1){
-	this._listeners[evt].splice(ix,1);}}
-
-
-
-	once(evt,fn){
-	var self=this;
-	var listener=function listener(){
-	fn.apply(this,arguments);
-	self.off(evt,listener);};
-
-	this.on(evt,listener);}
-
-
-	_handleMessage(payload){
-	if(payload.type==='resume'){
-	this._paused=false;
-	this._waiting=null;
-	this.flush();
-	return;}
-
-
-	if(payload.type==='pause'){
-	this._paused=true;
-	clearTimeout(this._waiting);
-	this._waiting=null;
-	return;}
-
-
-	if(payload.type==='callback'){
-	var callback=this._cbs.get(payload.id);
-	if(callback){
-	callback(...payload.args);
-	this._cbs.delete(payload.id);}
-
-	return;}
-
-
-	if(payload.type==='call'){
-	this._handleCall(payload.name,payload.args,payload.callback);
-	return;}
-
-
-	if(payload.type==='inspect'){
-	this._inspectResponse(payload.id,payload.path,payload.callback);
-	return;}
-
-
-	if(payload.type==='event'){
-
-	if(payload.cleaned){
-	hydrate(payload.data,payload.cleaned);}
-
-	var fns=this._listeners[payload.evt];
-	var data=payload.data;
-	if(fns){
-	fns.forEach(fn => fn(data));}}
-
-
-
-	if(payload.type==='many-events'){
-	payload.events.forEach(event => {
-
-	if(event.cleaned){
-	hydrate(event.data,event.cleaned);}
-
-	var handlers=this._listeners[event.evt];
-	if(handlers){
-	handlers.forEach(fn => fn(event.data));}});}}
-
-
-
-
-
-	_handleCall(name,args,callback){
-	if(!this._callers[name]){
-	return;}
-
-	args=!Array.isArray(args)?[args]:args;
-	var result;
-	try{
-	result=this._callers[name].apply(null,args);}
-	catch(e){
-
-	return undefined;}
-
-	this._wall.send({
-	type:'callback',
-	id:callback,
-	args:[result]});}
-
-
-
-	_inspectResponse(id,path,callback){
-	var inspectable=this._inspectables.get(id);
-
-	var result={};
-	var cleaned=[];
-	var proto=null;
-	var protoclean=[];
-	if(inspectable){
-	var val=getIn(inspectable,path);
-	var protod=false;
-	var isFn=typeof val==='function';
-	(0,_getOwnPropertyNames2.default)(val).forEach(name => {
-	if(name==='__proto__'){
-	protod=true;}
-
-	if(isFn&&(name==='arguments'||name==='callee'||name==='caller')){
-	return;}
-
-	result[name]=dehydrate(val[name],cleaned,[name]);});
-
-
-
-	if(!protod&&val.__proto__&&val.constructor.name!=='Object'){
-	var newProto={};
-	var pIsFn=typeof val.__proto__==='function';
-	(0,_getOwnPropertyNames2.default)(val.__proto__).forEach(name => {
-	if(pIsFn&&(name==='arguments'||name==='callee'||name==='caller')){
-	return;}
-
-	newProto[name]=dehydrate(val.__proto__[name],protoclean,[name]);});
-
-	proto=newProto;}}
-
-
-
-
-	this._wall.send({
-	type:'callback',
-	id:callback,
-	args:[result,cleaned,proto,protoclean]});}}
-
-
-
-
-	function getIn(base,path){
-	return path.reduce((obj,attr) => {
-	return obj?obj[attr]:null;},
-	base);}
-
-
-	module.exports=Bridge;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _getOwnPropertyNames = __webpack_require__(199);
+
+	var _getOwnPropertyNames2 = _interopRequireDefault(_getOwnPropertyNames);
+
+	var _extends2 = __webpack_require__(21);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	var _map = __webpack_require__(197);
+
+	var _map2 = _interopRequireDefault(_map);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var consts = __webpack_require__(20);
+	var hydrate = __webpack_require__(158);
+	var dehydrate = __webpack_require__(157);
+	var performanceNow = __webpack_require__(126);
+
+	/**
+	 * The bridge is responsible for serializing requests between the Agent and
+	 * the Frontend Store. It needs to be connected to a Wall object that can send
+	 * JSONable data to the bridge on the other side.
+	 *
+	 * complex data
+	 *     |
+	 *     v
+	 *  [Bridge]
+	 *     |
+	 * jsonable data
+	 *     |
+	 *     v
+	 *   [wall]
+	 *     |
+	 *     v
+	 * ~ some barrier ~
+	 *     |
+	 *     v
+	 *   [wall]
+	 *     |
+	 *     v
+	 *  [Bridge]
+	 *     |
+	 *     v
+	 * "hydrated" data
+	 *
+	 * When an item is passed in that can't be serialized (anything other than a
+	 * plain array, object, or literal value), the object is "cleaned", and
+	 * rehydrated on the other side with `Symbol` attributes indicating that the
+	 * object needs to be inspected for more detail.
+	 *
+	 * Example:
+	 *
+	 * bridge.send('evname', {id: 'someid', foo: MyCoolObjectInstance})
+	 * ->
+	 * shows up, hydrated as
+	 * {
+	 *   id: 'someid',
+	 *   foo: {
+	 *     [consts.name]: 'MyCoolObjectInstance',
+	 *     [consts.type]: 'object',
+	 *     [consts.meta]: {},
+	 *     [consts.inspected]: false,
+	 *   }
+	 * }
+	 *
+	 * The `consts` variables are Symbols, and as such are non-ennumerable.
+	 * The front-end therefore needs to check for `consts.inspected` on received
+	 * objects, and can thereby display object proxies and inspect them.
+	 *
+	 * Complex objects that are passed are expected to have a top-level `id`
+	 * attribute, which is used for later lookup + inspection. Once it has been
+	 * determined that an object is no longer needed, call `.forget(id)` to clean
+	 * up.
+	 */
+	class Bridge {
+
+	  constructor(wall) {
+	    this._cbs = new _map2.default();
+	    this._inspectables = new _map2.default();
+	    this._cid = 0;
+	    this._listeners = {};
+	    this._buffer = [];
+	    this._waiting = null;
+	    this._lastTime = 5;
+	    this._callers = {};
+	    this._paused = false;
+	    this._wall = wall;
+
+	    wall.listen(this._handleMessage.bind(this));
+	  }
+
+	  inspect(id, path, cb) {
+	    var _cid = this._cid++;
+	    this._cbs.set(_cid, (data, cleaned, proto, protoclean) => {
+	      if (cleaned.length) {
+	        hydrate(data, cleaned);
+	      }
+	      if (proto && protoclean.length) {
+	        hydrate(proto, protoclean);
+	      }
+	      if (proto) {
+	        data[consts.proto] = proto;
+	      }
+	      cb(data);
+	    });
+
+	    this._wall.send({
+	      type: 'inspect',
+	      callback: _cid,
+	      path,
+	      id
+	    });
+	  }
+
+	  call(name, args, cb) {
+	    var _cid = this._cid++;
+	    this._cbs.set(_cid, cb);
+
+	    this._wall.send({
+	      type: 'call',
+	      callback: _cid,
+	      args,
+	      name
+	    });
+	  }
+
+	  onCall(name, handler) {
+	    if (this._callers[name]) {
+	      throw new Error('only one call handler per call name allowed');
+	    }
+	    this._callers[name] = handler;
+	  }
+
+	  pause() {
+	    this._wall.send({
+	      type: 'pause'
+	    });
+	  }
+
+	  resume() {
+	    this._wall.send({
+	      type: 'resume'
+	    });
+	  }
+
+	  setInspectable(id, data) {
+	    var prev = this._inspectables.get(id);
+	    if (!prev) {
+	      this._inspectables.set(id, data);
+	      return;
+	    }
+	    this._inspectables.set(id, (0, _extends3.default)({}, prev, data));
+	  }
+
+	  sendOne(evt, data) {
+	    var cleaned = [];
+	    var san = dehydrate(data, cleaned);
+	    if (cleaned.length) {
+	      this.setInspectable(data.id, data);
+	    }
+	    this._wall.send({ type: 'event', evt, data: san, cleaned });
+	  }
+
+	  send(evt, data) {
+	    if (!this._waiting && !this._paused) {
+	      this._buffer = [];
+	      var nextTime = this._lastTime * 3;
+	      if (nextTime > 500) {
+	        // flush is taking an unexpected amount of time
+	        nextTime = 500;
+	      }
+	      this._waiting = setTimeout(() => {
+	        this.flush();
+	        this._waiting = null;
+	      }, nextTime);
+	    }
+	    this._buffer.push({ evt, data });
+	  }
+
+	  flush() {
+	    var start = performanceNow();
+	    var events = this._buffer.map(({ evt, data }) => {
+	      var cleaned = [];
+	      var san = dehydrate(data, cleaned);
+	      if (cleaned.length) {
+	        this.setInspectable(data.id, data);
+	      }
+	      return { type: 'event', evt, data: san, cleaned };
+	    });
+	    this._wall.send({ type: 'many-events', events });
+	    this._buffer = [];
+	    this._waiting = null;
+	    this._lastTime = performanceNow() - start;
+	  }
+
+	  forget(id) {
+	    this._inspectables.delete(id);
+	  }
+
+	  on(evt, fn) {
+	    if (!this._listeners[evt]) {
+	      this._listeners[evt] = [fn];
+	    } else {
+	      this._listeners[evt].push(fn);
+	    }
+	  }
+
+	  off(evt, fn) {
+	    if (!this._listeners[evt]) {
+	      return;
+	    }
+	    var ix = this._listeners[evt].indexOf(fn);
+	    if (ix !== -1) {
+	      this._listeners[evt].splice(ix, 1);
+	    }
+	  }
+
+	  once(evt, fn) {
+	    var self = this;
+	    var listener = function listener() {
+	      fn.apply(this, arguments);
+	      self.off(evt, listener);
+	    };
+	    this.on(evt, listener);
+	  }
+
+	  _handleMessage(payload) {
+	    if (payload.type === 'resume') {
+	      this._paused = false;
+	      this._waiting = null;
+	      this.flush();
+	      return;
+	    }
+
+	    if (payload.type === 'pause') {
+	      this._paused = true;
+	      clearTimeout(this._waiting);
+	      this._waiting = null;
+	      return;
+	    }
+
+	    if (payload.type === 'callback') {
+	      var callback = this._cbs.get(payload.id);
+	      if (callback) {
+	        callback(...payload.args);
+	        this._cbs.delete(payload.id);
+	      }
+	      return;
+	    }
+
+	    if (payload.type === 'call') {
+	      this._handleCall(payload.name, payload.args, payload.callback);
+	      return;
+	    }
+
+	    if (payload.type === 'inspect') {
+	      this._inspectResponse(payload.id, payload.path, payload.callback);
+	      return;
+	    }
+
+	    if (payload.type === 'event') {
+	      // console.log('[bridge<-]', payload.evt);
+	      if (payload.cleaned) {
+	        hydrate(payload.data, payload.cleaned);
+	      }
+	      var fns = this._listeners[payload.evt];
+	      var data = payload.data;
+	      if (fns) {
+	        fns.forEach(fn => fn(data));
+	      }
+	    }
+
+	    if (payload.type === 'many-events') {
+	      payload.events.forEach(event => {
+	        // console.log('[bridge<-]', payload.evt);
+	        if (event.cleaned) {
+	          hydrate(event.data, event.cleaned);
+	        }
+	        var handlers = this._listeners[event.evt];
+	        if (handlers) {
+	          handlers.forEach(fn => fn(event.data));
+	        }
+	      });
+	    }
+	  }
+
+	  _handleCall(name, args, callback) {
+	    if (!this._callers[name]) {
+	      return;
+	    }
+	    args = !Array.isArray(args) ? [args] : args;
+	    var result;
+	    try {
+	      result = this._callers[name].apply(null, args);
+	    } catch (e) {
+	      return undefined;
+	    }
+	    this._wall.send({
+	      type: 'callback',
+	      id: callback,
+	      args: [result]
+	    });
+	  }
+
+	  _inspectResponse(id, path, callback) {
+	    var inspectable = this._inspectables.get(id);
+
+	    var result = {};
+	    var cleaned = [];
+	    var proto = null;
+	    var protoclean = [];
+	    if (inspectable) {
+	      var val = getIn(inspectable, path);
+	      var protod = false;
+	      var isFn = typeof val === 'function';
+	      (0, _getOwnPropertyNames2.default)(val).forEach(name => {
+	        if (name === '__proto__') {
+	          protod = true;
+	        }
+	        if (isFn && (name === 'arguments' || name === 'callee' || name === 'caller')) {
+	          return;
+	        }
+	        result[name] = dehydrate(val[name], cleaned, [name]);
+	      });
+
+	      /* eslint-disable no-proto */
+	      if (!protod && val.__proto__ && val.constructor.name !== 'Object') {
+	        var newProto = {};
+	        var pIsFn = typeof val.__proto__ === 'function';
+	        (0, _getOwnPropertyNames2.default)(val.__proto__).forEach(name => {
+	          if (pIsFn && (name === 'arguments' || name === 'callee' || name === 'caller')) {
+	            return;
+	          }
+	          newProto[name] = dehydrate(val.__proto__[name], protoclean, [name]);
+	        });
+	        proto = newProto;
+	      }
+	      /* eslint-enable no-proto */
+	    }
+
+	    this._wall.send({
+	      type: 'callback',
+	      id: callback,
+	      args: [result, cleaned, proto, protoclean]
+	    });
+	  }
+	}
+
+	function getIn(base, path) {
+	  return path.reduce((obj, attr) => {
+	    return obj ? obj[attr] : null;
+	  }, base);
+	}
+
+	module.exports = Bridge;
 
 /***/ },
 /* 157 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	/**
+	 * Strip out complex data (instances, functions, and data nested > 2 levels
+	 * deep). The paths of the stripped out objects are appended to the `cleaned`
+	 * list. On the other side of the barrier, the cleaned list is used to
+	 * "re-hydrate" the cleaned representation into an object with symbols as
+	 * attributes, so that a sanitized object can be distinguished from a normal
+	 * object.
+	 *
+	 * Input: {"some": {"attr": fn()}, "other": AnInstance}
+	 * Output: {
+	 *   "some": {
+	 *     "attr": {"name": the fn.name, type: "function"}
+	 *   },
+	 *   "other": {
+	 *     "name": "AnInstance",
+	 *     "type": "object",
+	 *   },
+	 * }
+	 * and cleaned = [["some", "attr"], ["other"]]
+	 */
 
+	function dehydrate(data, cleaned, path, level) {
+	  level = level || 0;
+	  path = path || [];
+	  if (typeof data === 'function') {
+	    cleaned.push(path);
+	    return {
+	      name: data.name,
+	      type: 'function'
+	    };
+	  }
+	  if (!data || typeof data !== 'object') {
+	    if (typeof data === 'string' && data.length > 500) {
+	      return data.slice(0, 500) + '...';
+	    }
+	    // We have to do this assignment b/c Flow doesn't think "symbol" is
+	    // something typeof would return. Error 'unexpected predicate "symbol"'
+	    var type = typeof data;
+	    if (type === 'symbol') {
+	      cleaned.push(path);
+	      return {
+	        type: 'symbol',
+	        name: data.toString()
+	      };
+	    }
+	    return data;
+	  }
+	  if (data._reactFragment) {
+	    // React Fragments error if you try to inspect them.
+	    return 'A react fragment';
+	  }
+	  if (level > 2) {
+	    cleaned.push(path);
+	    return {
+	      type: Array.isArray(data) ? 'array' : 'object',
+	      name: !data.constructor || data.constructor.name === 'Object' ? '' : data.constructor.name,
+	      meta: Array.isArray(data) ? {
+	        length: data.length
+	      } : null
+	    };
+	  }
+	  if (Array.isArray(data)) {
+	    // $FlowFixMe path is not undefined.
+	    return data.map((item, i) => dehydrate(item, cleaned, path.concat([i]), level + 1));
+	  }
+	  // TODO when this is in the iframe window, we can just use Object
+	  if (data.constructor && typeof data.constructor === 'function' && data.constructor.name !== 'Object') {
+	    cleaned.push(path);
+	    return {
+	      name: data.constructor.name,
+	      type: 'object'
+	    };
+	  }
+	  var res = {};
+	  for (var name in data) {
+	    res[name] = dehydrate(data[name], cleaned, path.concat([name]), level + 1);
+	  }
+	  return res;
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	function dehydrate(data,cleaned,path,level){
-	level=level||0;
-	path=path||[];
-	if(typeof data==='function'){
-	cleaned.push(path);
-	return {
-	name:data.name,
-	type:'function'};}
-
-
-	if(!data||typeof data!=='object'){
-	if(typeof data==='string'&&data.length>500){
-	return data.slice(0,500)+'...';}
-
-
-
-	var type=typeof data;
-	if(type==='symbol'){
-	cleaned.push(path);
-	return {
-	type:'symbol',
-	name:data.toString()};}
-
-
-	return data;}
-
-	if(data._reactFragment){
-
-	return 'A react fragment';}
-
-	if(level>2){
-	cleaned.push(path);
-	return {
-	type:Array.isArray(data)?'array':'object',
-	name:!data.constructor||data.constructor.name==='Object'?'':data.constructor.name,
-	meta:Array.isArray(data)?{
-	length:data.length}:
-	null};}
-
-
-	if(Array.isArray(data)){
-
-	return data.map((item,i) => dehydrate(item,cleaned,path.concat([i]),level+1));}
-
-
-	if(data.constructor&&typeof data.constructor==='function'&&data.constructor.name!=='Object'){
-	cleaned.push(path);
-	return {
-	name:data.constructor.name,
-	type:'object'};}
-
-
-	var res={};
-	for(var name in data){
-	res[name]=dehydrate(data[name],cleaned,path.concat([name]),level+1);}
-
-	return res;}
-
-
-	module.exports=dehydrate;
+	module.exports = dehydrate;
 
 /***/ },
 /* 158 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var consts = __webpack_require__(20);
 
+	function hydrate(data, cleaned) {
+	  cleaned.forEach(path => {
+	    var last = path.pop();
+	    var obj = path.reduce((obj_, attr) => obj_ ? obj_[attr] : null, data);
+	    if (!obj || !obj[last]) {
+	      return;
+	    }
+	    var replace = {};
+	    replace[consts.name] = obj[last].name;
+	    replace[consts.type] = obj[last].type;
+	    replace[consts.meta] = obj[last].meta;
+	    replace[consts.inspected] = false;
+	    obj[last] = replace;
+	  });
+	}
 
-
-
-
-
-
-
-
-
-	var consts=__webpack_require__(20);
-
-	function hydrate(data,cleaned){
-	cleaned.forEach(path => {
-	var last=path.pop();
-	var obj=path.reduce((obj_,attr) => obj_?obj_[attr]:null,data);
-	if(!obj||!obj[last]){
-	return;}
-
-	var replace={};
-	replace[consts.name]=obj[last].name;
-	replace[consts.type]=obj[last].type;
-	replace[consts.meta]=obj[last].meta;
-	replace[consts.inspected]=false;
-	obj[last]=replace;});}
-
-
-
-	module.exports=hydrate;
+	module.exports = hydrate;
 
 /***/ },
 /* 159 */,
 /* 160 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	/* global chrome */
 
-
-
-
-
-
-
-
-
-
-
-
-	module.exports=function(done){
-	chrome.devtools.inspectedWindow.eval(`!!(
+	module.exports = function (done) {
+	  chrome.devtools.inspectedWindow.eval(`!!(
 	    Object.keys(window.__REACT_DEVTOOLS_GLOBAL_HOOK__._renderers).length || window.React || (window.require && (require('react') || require('React')))
-	  )`,function(pageHasReact,err){
-	done(pageHasReact);});};
+	  )`, function (pageHasReact, err) {
+	    done(pageHasReact);
+	  });
+	};
 
 /***/ },
 /* 161 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
+	class BlurInput extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = { text: this.props.value || '' };
+	  }
 
+	  componentWillReceiveProps(nextProps) {
+	    if (nextProps.value !== this.props.value) {
+	      this.setState({ text: '' + nextProps.value });
+	    }
+	  }
 
+	  done() {
+	    if (this.state.text !== (this.props.value || '')) {
+	      this.props.onChange(this.state.text);
+	    }
+	  }
 
+	  onKeyDown(e) {
+	    if (e.key === 'Enter') {
+	      this.done();
+	      return;
+	    }
+	  }
 
+	  render() {
+	    return React.createElement('input', {
+	      value: this.state.text,
+	      ref: i => this.node = i,
+	      onChange: e => this.setState({ text: e.target.value }),
+	      onBlur: this.done.bind(this),
+	      onKeyDown: e => this.onKeyDown(e)
+	    });
+	  }
+	}
 
-
-
-
-	var React=__webpack_require__(3);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class BlurInput extends React.Component{
-
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={text:this.props.value||''};}
-
-
-	componentWillReceiveProps(nextProps){
-	if(nextProps.value!==this.props.value){
-	this.setState({text:''+nextProps.value});}}
-
-
-
-	done(){
-	if(this.state.text!==(this.props.value||'')){
-	this.props.onChange(this.state.text);}}
-
-
-
-	onKeyDown(e){
-	if(e.key==='Enter'){
-	this.done();
-	return;}}
-
-
-
-	render(){
-	return (
-	React.createElement('input',{
-	value:this.state.text,
-	ref:i => this.node=i,
-	onChange:e => this.setState({text:e.target.value}),
-	onBlur:this.done.bind(this),
-	onKeyDown:e => this.onKeyDown(e)}));}}
-
-
-
-
-
-	module.exports=BlurInput;
+	module.exports = BlurInput;
 
 /***/ },
 /* 162 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var assign = __webpack_require__(2);
+	var decorate = __webpack_require__(7);
 
+	class Breadcrumb extends React.Component {
+	  render() {
+	    return React.createElement(
+	      'ul',
+	      { style: styles.container },
+	      this.props.path.map(({ id, node }) => {
+	        var isSelected = id === this.props.selected;
+	        var style = assign({}, styles.item, node.get('nodeType') === 'Composite' && styles.composite, isSelected && styles.selected);
+	        return React.createElement(
+	          'li',
+	          {
+	            style: style,
+	            key: id,
+	            onMouseOver: () => this.props.hover(id, true),
+	            onMouseOut: () => this.props.hover(id, false),
+	            onClick: isSelected ? null : () => this.props.select(id)
+	          },
+	          node.get('name') || '"' + node.get('text') + '"'
+	        );
+	      })
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    borderTop: '1px solid #ccc',
+	    backgroundColor: 'white',
+	    listStyle: 'none',
+	    padding: 0,
+	    margin: 0
+	  },
 
+	  selected: {
+	    cursor: 'default',
+	    backgroundColor: 'rgb(56, 121, 217)',
+	    color: 'white'
+	  },
 
+	  composite: {
+	    color: 'rgb(136, 18, 128)'
+	  },
 
+	  item: {
+	    padding: '3px 7px',
+	    cursor: 'pointer',
+	    display: 'inline-block'
+	  }
+	};
 
+	function getBreadcrumbPath(store) {
+	  var path = [];
+	  var current = store.breadcrumbHead;
+	  while (current) {
+	    path.unshift({
+	      id: current,
+	      node: store.get(current)
+	    });
+	    current = store.skipWrapper(store.getParent(current), true);
+	  }
+	  return path;
+	}
 
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var assign=__webpack_require__(2);
-	var decorate=__webpack_require__(7);
-
-	class Breadcrumb extends React.Component{
-	render(){
-	return (
-	React.createElement('ul',{style:styles.container},
-	this.props.path.map(({id,node}) => {
-	var isSelected=id===this.props.selected;
-	var style=assign(
-	{},
-	styles.item,
-	node.get('nodeType')==='Composite'&&styles.composite,
-	isSelected&&styles.selected);
-
-	return (
-	React.createElement('li',{
-	style:style,
-	key:id,
-	onMouseOver:() => this.props.hover(id,true),
-	onMouseOut:() => this.props.hover(id,false),
-	onClick:isSelected?null:() => this.props.select(id)},
-
-	node.get('name')||'"'+node.get('text')+'"'));})));}}
-
-
-
-
-
-
-
-
-	var styles={
-	container:{
-	borderTop:'1px solid #ccc',
-	backgroundColor:'white',
-	listStyle:'none',
-	padding:0,
-	margin:0},
-
-
-	selected:{
-	cursor:'default',
-	backgroundColor:'rgb(56, 121, 217)',
-	color:'white'},
-
-
-	composite:{
-	color:'rgb(136, 18, 128)'},
-
-
-	item:{
-	padding:'3px 7px',
-	cursor:'pointer',
-	display:'inline-block'}};
-
-
-
-	function getBreadcrumbPath(store){
-	var path=[];
-	var current=store.breadcrumbHead;
-	while(current){
-	path.unshift({
-	id:current,
-	node:store.get(current)});
-
-	current=store.skipWrapper(store.getParent(current),true);}
-
-	return path;}
-
-
-	module.exports=decorate({
-	listeners:() => ['breadcrumbHead','selected'],
-	props(store,props){
-	return {
-	select:id => store.selectBreadcrumb(id),
-	hover:(id,isHovered) => store.setHover(id,isHovered),
-	selected:store.selected,
-	path:getBreadcrumbPath(store)};}},
-
-
-	Breadcrumb);
+	module.exports = decorate({
+	  listeners: () => ['breadcrumbHead', 'selected'],
+	  props(store, props) {
+	    return {
+	      select: id => store.selectBreadcrumb(id),
+	      hover: (id, isHovered) => store.setHover(id, isHovered),
+	      selected: store.selected,
+	      path: getBreadcrumbPath(store)
+	    };
+	  }
+	}, Breadcrumb);
 
 /***/ },
 /* 163 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _extends2 = __webpack_require__(21);
 
+	var _extends3 = _interopRequireDefault(_extends2);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var ContextMenu = __webpack_require__(164);
+	var PropState = __webpack_require__(171);
+	var React = __webpack_require__(3);
+	var SearchPane = __webpack_require__(174);
+	var SplitPane = __webpack_require__(98);
+	var TabbedPane = __webpack_require__(177);
 
+	class Container extends React.Component {
 
+	  render() {
+	    var tabs = (0, _extends3.default)({
+	      Elements: () => React.createElement(SplitPane, {
+	        initialWidth: 300,
+	        left: () => React.createElement(SearchPane, { reload: this.props.reload }),
+	        right: () => React.createElement(PropState, { extraPanes: this.props.extraPanes })
+	      })
+	    }, this.props.extraTabs);
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(TabbedPane, { tabs: tabs }),
+	      React.createElement(ContextMenu, { itemSources: [DEFAULT_MENU_ITEMS, this.props.menuItems] })
+	    );
+	  }
+	}
 
+	var DEFAULT_MENU_ITEMS = {
+	  tree: (id, node, store) => {
+	    var items = [];
+	    if (node.get('name')) {
+	      items.push({
+	        title: 'Show all ' + node.get('name'),
+	        action: () => store.changeSearch(node.get('name'))
+	      });
+	    }
+	    if (store.capabilities.scroll) {
+	      items.push({
+	        title: 'Scroll to Node',
+	        action: () => store.scrollToNode(id)
+	      });
+	    }
+	    return items;
+	  },
+	  attr: (id, node, val, path, name, store) => {
+	    var items = [{
+	      title: 'Store as global variable',
+	      action: () => store.makeGlobal(id, path)
+	    }];
+	    return items;
+	  }
+	};
 
+	var styles = {
+	  container: {
+	    flex: 1,
+	    display: 'flex',
+	    minWidth: 0
+	  }
+	};
 
-
-
-	var ContextMenu=__webpack_require__(164);
-	var PropState=__webpack_require__(171);
-	var React=__webpack_require__(3);
-	var SearchPane=__webpack_require__(174);
-	var SplitPane=__webpack_require__(98);
-	var TabbedPane=__webpack_require__(177);
-
-
-
-	class Container extends React.Component{
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	render(){
-	var tabs=(0,_extends3.default)({
-	Elements:() => 
-	React.createElement(SplitPane,{
-	initialWidth:300,
-	left:() => React.createElement(SearchPane,{reload:this.props.reload}),
-	right:() => React.createElement(PropState,{extraPanes:this.props.extraPanes})})},
-
-
-	this.props.extraTabs);
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement(TabbedPane,{tabs:tabs}),
-	React.createElement(ContextMenu,{itemSources:[DEFAULT_MENU_ITEMS,this.props.menuItems]})));}}
-
-
-
-
-
-	var DEFAULT_MENU_ITEMS={
-	tree:(id,node,store) => {
-	var items=[];
-	if(node.get('name')){
-	items.push({
-	title:'Show all '+node.get('name'),
-	action:() => store.changeSearch(node.get('name'))});}
-
-
-	if(store.capabilities.scroll){
-	items.push({
-	title:'Scroll to Node',
-	action:() => store.scrollToNode(id)});}
-
-
-	return items;},
-
-	attr:(id,node,val,path,name,store) => {
-	var items=[{
-	title:'Store as global variable',
-	action:() => store.makeGlobal(id,path)}];
-
-	return items;}};
-
-
-
-	var styles={
-	container:{
-	flex:1,
-	display:'flex',
-	minWidth:0}};
-
-
-
-	module.exports=Container;
+	module.exports = Container;
 
 /***/ },
 /* 164 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-	var HighlightHover=__webpack_require__(168);
-
-	var assign=__webpack_require__(2);
-	var decorate=__webpack_require__(7);
-
-
-
-
-
-
-	class ContextMenu extends React.Component{
-
-
-
-
-
-
-
-
-
-
-
-
-	componentWillMount(){
-	this._clickout=this.onMouseDown.bind(this);}
-
-
-	componentDidUpdate(prevProps){
-	if(this.props.open&&!prevProps.open){
-	window.addEventListener('mousedown',this._clickout,true);}else 
-	if(prevProps.open&&!this.props.open){
-	window.removeEventListener('mousedown',this._clickout,true);}}
-
-
-
-	componentWillUnmount(){
-	window.removeEventListener('mousedown',this._clickout,true);}
-
-
-	onMouseDown(evt){
-	var n=evt.target;
-	var container=ReactDOM.findDOMNode(this);
-	while(n){
-	if(n===container){
-	return;}
-
-	n=n.offsetParent;}
-
-
-	evt.preventDefault();
-	this.props.hideContextMenu();}
-
-
-	onClick(i,evt){
-	evt.preventDefault();
-	this.props.items[i].action();
-	this.props.hideContextMenu();}
-
-
-	render(){
-	if(!this.props.open){
-	return React.createElement('div',{style:styles.hidden});}
-
-
-	var containerStyle=assign({},styles.container,{
-	top:this.props.pos.y+'px',
-	left:this.props.pos.x+'px'});
-
-
-	return (
-	React.createElement('ul',{style:containerStyle},
-	!this.props.items.length&&React.createElement('li',{style:styles.empty},'No actions'),
-	this.props.items.map((item,i) => item&&
-	React.createElement('li',{onClick:evt => this.onClick(i,evt)},
-	React.createElement(HighlightHover,{style:styles.item},
-	item.title)))));}}
-
-
-
-
-
-
-
-
-	var Wrapped=decorate({
-	listeners(){
-	return ['contextMenu'];},
-
-	props(store,props){
-	if(!store.contextMenu){
-	return {open:false};}
-
-	var {x,y,type,args}=store.contextMenu;
-
-	var items=[];
-	args.push(store);
-
-	props.itemSources.forEach(source => {
-	if(!source||!source[type]){
-	return;}
-
-	var newItems=source[type](...args);
-	if(newItems){
-	items=items.concat(newItems.filter(v => !!v));}});
-
-
-
-	return {
-	open:true,
-	pos:{x,y},
-	hideContextMenu:() => store.hideContextMenu(),
-	items};}},
-
-
-	ContextMenu);
-
-	var styles={
-	hidden:{
-	display:'none'},
-
-
-	container:{
-	position:'fixed',
-	backgroundColor:'white',
-	boxShadow:'0 3px 5px #ccc',
-	listStyle:'none',
-	margin:0,
-	padding:0,
-	fontFamily:'sans-serif',
-	fontSize:14},
-
-
-	item:{
-	padding:'5px 10px',
-	cursor:'pointer'},
-
-
-	empty:{
-	padding:'5px 10px',
-	color:'#888'}};
-
-
-
-	module.exports=Wrapped;
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
+	var HighlightHover = __webpack_require__(168);
+
+	var assign = __webpack_require__(2);
+	var decorate = __webpack_require__(7);
+
+	class ContextMenu extends React.Component {
+
+	  componentWillMount() {
+	    this._clickout = this.onMouseDown.bind(this);
+	  }
+
+	  componentDidUpdate(prevProps) {
+	    if (this.props.open && !prevProps.open) {
+	      window.addEventListener('mousedown', this._clickout, true);
+	    } else if (prevProps.open && !this.props.open) {
+	      window.removeEventListener('mousedown', this._clickout, true);
+	    }
+	  }
+
+	  componentWillUnmount() {
+	    window.removeEventListener('mousedown', this._clickout, true);
+	  }
+
+	  onMouseDown(evt) {
+	    var n = evt.target;
+	    var container = ReactDOM.findDOMNode(this);
+	    while (n) {
+	      if (n === container) {
+	        return;
+	      }
+	      n = n.offsetParent;
+	    }
+
+	    evt.preventDefault();
+	    this.props.hideContextMenu();
+	  }
+
+	  onClick(i, evt) {
+	    evt.preventDefault();
+	    this.props.items[i].action();
+	    this.props.hideContextMenu();
+	  }
+
+	  render() {
+	    if (!this.props.open) {
+	      return React.createElement('div', { style: styles.hidden });
+	    }
+
+	    var containerStyle = assign({}, styles.container, {
+	      top: this.props.pos.y + 'px',
+	      left: this.props.pos.x + 'px'
+	    });
+
+	    return React.createElement(
+	      'ul',
+	      { style: containerStyle },
+	      !this.props.items.length && React.createElement(
+	        'li',
+	        { style: styles.empty },
+	        'No actions'
+	      ),
+	      this.props.items.map((item, i) => item && React.createElement(
+	        'li',
+	        { onClick: evt => this.onClick(i, evt) },
+	        React.createElement(
+	          HighlightHover,
+	          { style: styles.item },
+	          item.title
+	        )
+	      ))
+	    );
+	  }
+	}
+
+	var Wrapped = decorate({
+	  listeners() {
+	    return ['contextMenu'];
+	  },
+	  props(store, props) {
+	    if (!store.contextMenu) {
+	      return { open: false };
+	    }
+	    var { x, y, type, args } = store.contextMenu;
+
+	    var items = [];
+	    args.push(store);
+
+	    props.itemSources.forEach(source => {
+	      if (!source || !source[type]) {
+	        return;
+	      }
+	      var newItems = source[type](...args);
+	      if (newItems) {
+	        items = items.concat(newItems.filter(v => !!v));
+	      }
+	    });
+
+	    return {
+	      open: true,
+	      pos: { x, y },
+	      hideContextMenu: () => store.hideContextMenu(),
+	      items
+	    };
+	  }
+	}, ContextMenu);
+
+	var styles = {
+	  hidden: {
+	    display: 'none'
+	  },
+
+	  container: {
+	    position: 'fixed',
+	    backgroundColor: 'white',
+	    boxShadow: '0 3px 5px #ccc',
+	    listStyle: 'none',
+	    margin: 0,
+	    padding: 0,
+	    fontFamily: 'sans-serif',
+	    fontSize: 14
+	  },
+
+	  item: {
+	    padding: '5px 10px',
+	    cursor: 'pointer'
+	  },
+
+	  empty: {
+	    padding: '5px 10px',
+	    color: '#888'
+	  }
+	};
+
+	module.exports = Wrapped;
 
 /***/ },
 /* 165 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _stringify=__webpack_require__(102);var _stringify2=_interopRequireDefault(_stringify);var _symbol=__webpack_require__(201);var _symbol2=_interopRequireDefault(_symbol);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-
-	var assign=__webpack_require__(2);
-	var flash=__webpack_require__(101);
-	var valueStyles=__webpack_require__(59);
-
-
-
-
-
-
-
-
-	class Simple extends React.Component{
-
-
-
-	constructor(props){
-	super(props);
-	this.state={
-	text:'',
-	editing:false};}
-
-
-
-	onChange(e){
-	this.setState({
-	text:e.target.value});}
-
-
-
-	onKeyDown(e){
-	if(e.key==='Enter'){
-	this.onSubmit(true);}
-
-	if(e.key==='Escape'){
-	this.setState({
-	editing:false});}}
-
-
-
-
-	onSubmit(editing){
-	if(this.state.text===valueToText(this.props.data)){
-	this.setState({
-	editing:editing});
-
-	return;}
-
-	var value=textToValue(this.state.text);
-	if(value===BAD_INPUT){
-	this.setState({
-	text:valueToText(this.props.data),
-	editing:editing});
-
-	return;}
-
-	this.context.onChange(this.props.path,value);
-	this.setState({
-	editing:editing});}
-
-
-
-	startEditing(){
-	if(this.props.readOnly){
-	return;}
-
-	this.setState({
-	editing:true,
-	text:valueToText(this.props.data)});}
-
-
-
-	selectAll(){
-	const input=this.input;
-	input.selectionStart=0;
-	input.selectionEnd=input.value.length;}
-
-
-	componentDidUpdate(prevProps,prevState){
-	if(this.state.editing&&!prevState.editing){
-	this.selectAll();}
-
-	if(!this.state.editing&&this.props.data!==prevProps.data){
-	flash(ReactDOM.findDOMNode(this),'rgba(0, 255, 0, 1)','transparent',1);}}
-
-
-
-	render(){
-	if(this.state.editing){
-	return (
-	React.createElement('input',{
-	autoFocus:true,
-	ref:i => this.input=i,
-	style:styles.input,
-	onChange:e => this.onChange(e),
-	onBlur:() => this.onSubmit(false),
-	onKeyDown:this.onKeyDown.bind(this),
-	value:this.state.text}));}
-
-
-
-
-	var data=this.props.data;
-	var type=typeof data;
-	var style=styles.simple;
-	var typeStyle;
-	if(type==='boolean'){
-	typeStyle=valueStyles.bool;}else 
-	if(!this.props.data){
-	typeStyle=valueStyles.empty;}else 
-	if(type==='string'){
-	typeStyle=valueStyles.string;
-	if(data.length>200){
-	data=data.slice(0,200)+'…';}}else 
-
-	if(type==='number'){
-	typeStyle=valueStyles.number;}
-
-	style=assign({},style,typeStyle);
-	if(!this.props.readOnly){
-	assign(style,styles.editable);}
-
-	return (
-	React.createElement('div',{
-	onClick:this.startEditing.bind(this),
-	style:style},
-	valueToText(data)));}}
-
-
-
-
-
-	Simple.propTypes={
-	data:React.PropTypes.any,
-	path:React.PropTypes.array,
-	readOnly:React.PropTypes.bool};
-
-
-	Simple.contextTypes={
-	onChange:React.PropTypes.func};
-
-
-	var styles={
-	simple:{
-	display:'flex',
-	flex:1,
-	whiteSpace:'pre-wrap'},
-
-
-	editable:{
-	cursor:'pointer'},
-
-
-	input:{
-	flex:1,
-	minWidth:50,
-	boxSizing:'border-box',
-	border:'none',
-	padding:0,
-	outline:'none',
-	boxShadow:'0 0 3px #ccc',
-	fontFamily:'monospace',
-	fontSize:'inherit'}};
-
-
-
-	var BAD_INPUT=(0,_symbol2.default)('bad input');
-
-	function textToValue(txt){
-	if(!txt.length){
-	return BAD_INPUT;}
-
-	if(txt==='undefined'){
-	return undefined;}
-
-	try{
-	return JSON.parse(txt);}
-	catch(e){
-	return BAD_INPUT;}}
-
-
-
-	function valueToText(value){
-	if(value===undefined){
-	return 'undefined';}
-
-	return (0,_stringify2.default)(value);}
-
-
-	module.exports=Simple;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _stringify = __webpack_require__(102);
+
+	var _stringify2 = _interopRequireDefault(_stringify);
+
+	var _symbol = __webpack_require__(201);
+
+	var _symbol2 = _interopRequireDefault(_symbol);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
+
+	var assign = __webpack_require__(2);
+	var flash = __webpack_require__(101);
+	var valueStyles = __webpack_require__(59);
+
+	class Simple extends React.Component {
+
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	      text: '',
+	      editing: false
+	    };
+	  }
+
+	  onChange(e) {
+	    this.setState({
+	      text: e.target.value
+	    });
+	  }
+
+	  onKeyDown(e) {
+	    if (e.key === 'Enter') {
+	      this.onSubmit(true);
+	    }
+	    if (e.key === 'Escape') {
+	      this.setState({
+	        editing: false
+	      });
+	    }
+	  }
+
+	  onSubmit(editing) {
+	    if (this.state.text === valueToText(this.props.data)) {
+	      this.setState({
+	        editing: editing
+	      });
+	      return;
+	    }
+	    var value = textToValue(this.state.text);
+	    if (value === BAD_INPUT) {
+	      this.setState({
+	        text: valueToText(this.props.data),
+	        editing: editing
+	      });
+	      return;
+	    }
+	    this.context.onChange(this.props.path, value);
+	    this.setState({
+	      editing: editing
+	    });
+	  }
+
+	  startEditing() {
+	    if (this.props.readOnly) {
+	      return;
+	    }
+	    this.setState({
+	      editing: true,
+	      text: valueToText(this.props.data)
+	    });
+	  }
+
+	  selectAll() {
+	    const input = this.input;
+	    input.selectionStart = 0;
+	    input.selectionEnd = input.value.length;
+	  }
+
+	  componentDidUpdate(prevProps, prevState) {
+	    if (this.state.editing && !prevState.editing) {
+	      this.selectAll();
+	    }
+	    if (!this.state.editing && this.props.data !== prevProps.data) {
+	      flash(ReactDOM.findDOMNode(this), 'rgba(0, 255, 0, 1)', 'transparent', 1);
+	    }
+	  }
+
+	  render() {
+	    if (this.state.editing) {
+	      return React.createElement('input', {
+	        autoFocus: true,
+	        ref: i => this.input = i,
+	        style: styles.input,
+	        onChange: e => this.onChange(e),
+	        onBlur: () => this.onSubmit(false),
+	        onKeyDown: this.onKeyDown.bind(this),
+	        value: this.state.text
+	      });
+	    }
+
+	    var data = this.props.data;
+	    var type = typeof data;
+	    var style = styles.simple;
+	    var typeStyle;
+	    if (type === 'boolean') {
+	      typeStyle = valueStyles.bool;
+	    } else if (!this.props.data) {
+	      typeStyle = valueStyles.empty;
+	    } else if (type === 'string') {
+	      typeStyle = valueStyles.string;
+	      if (data.length > 200) {
+	        data = data.slice(0, 200) + '…';
+	      }
+	    } else if (type === 'number') {
+	      typeStyle = valueStyles.number;
+	    }
+	    style = assign({}, style, typeStyle);
+	    if (!this.props.readOnly) {
+	      assign(style, styles.editable);
+	    }
+	    return React.createElement(
+	      'div',
+	      {
+	        onClick: this.startEditing.bind(this),
+	        style: style },
+	      valueToText(data)
+	    );
+	  }
+	}
+
+	Simple.propTypes = {
+	  data: React.PropTypes.any,
+	  path: React.PropTypes.array,
+	  readOnly: React.PropTypes.bool
+	};
+
+	Simple.contextTypes = {
+	  onChange: React.PropTypes.func
+	};
+
+	var styles = {
+	  simple: {
+	    display: 'flex',
+	    flex: 1,
+	    whiteSpace: 'pre-wrap'
+	  },
+
+	  editable: {
+	    cursor: 'pointer'
+	  },
+
+	  input: {
+	    flex: 1,
+	    minWidth: 50,
+	    boxSizing: 'border-box',
+	    border: 'none',
+	    padding: 0,
+	    outline: 'none',
+	    boxShadow: '0 0 3px #ccc',
+	    fontFamily: 'monospace',
+	    fontSize: 'inherit'
+	  }
+	};
+
+	var BAD_INPUT = (0, _symbol2.default)('bad input');
+
+	function textToValue(txt) {
+	  if (!txt.length) {
+	    return BAD_INPUT;
+	  }
+	  if (txt === 'undefined') {
+	    return undefined;
+	  }
+	  try {
+	    return JSON.parse(txt);
+	  } catch (e) {
+	    return BAD_INPUT;
+	  }
+	}
+
+	function valueToText(value) {
+	  if (value === undefined) {
+	    return 'undefined';
+	  }
+	  return (0, _stringify2.default)(value);
+	}
+
+	module.exports = Simple;
 
 /***/ },
 /* 166 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
+	var consts = __webpack_require__(20);
+	var valueStyles = __webpack_require__(59);
 
+	function previewComplex(data) {
+	  if (Array.isArray(data)) {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.array },
+	      'Array[',
+	      data.length,
+	      ']'
+	    );
+	  }
 
+	  if (!data[consts.type]) {
+	    return '{…}';
+	  }
 
+	  var type = data[consts.type];
+	  if (type === 'function') {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.func },
+	      data[consts.name] || 'fn',
+	      '()'
+	    );
+	  } else if (type === 'object') {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.object },
+	      data[consts.name] + '{…}'
+	    );
+	  } else if (type === 'symbol') {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.symbol },
+	      data[consts.name]
+	    );
+	  }
+	}
 
-
-
-
-
-
-	var React=__webpack_require__(3);
-
-	var consts=__webpack_require__(20);
-	var valueStyles=__webpack_require__(59);
-
-	function previewComplex(data){
-	if(Array.isArray(data)){
-	return (
-	React.createElement('span',{style:valueStyles.array},'Array[',
-	data.length,']'));}
-
-
-
-
-	if(!data[consts.type]){
-	return '{…}';}
-
-
-	var type=data[consts.type];
-	if(type==='function'){
-	return (
-	React.createElement('span',{style:valueStyles.func},
-	data[consts.name]||'fn','()'));}else 
-
-
-	if(type==='object'){
-	return (
-	React.createElement('span',{style:valueStyles.object},
-	data[consts.name]+'{…}'));}else 
-
-
-	if(type==='symbol'){
-	return (
-	React.createElement('span',{style:valueStyles.symbol},
-	data[consts.name]));}}
-
-
-
-
-
-	module.exports=previewComplex;
+	module.exports = previewComplex;
 
 /***/ },
 /* 167 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
 
 
+	class Draggable extends React.Component {
 
+	  componentDidMount() {
+	    this._onMove = this.onMove.bind(this);
+	    this._onUp = this.onUp.bind(this);
+	  }
 
+	  _startDragging(evt) {
+	    evt.preventDefault();
+	    var doc = ReactDOM.findDOMNode(this).ownerDocument;
+	    doc.addEventListener('mousemove', this._onMove);
+	    doc.addEventListener('mouseup', this._onUp);
+	    this.props.onStart();
+	  }
 
+	  onMove(evt) {
+	    evt.preventDefault();
+	    this.props.onMove(evt.pageX, evt.pageY);
+	  }
 
+	  onUp(evt) {
+	    evt.preventDefault();
+	    var doc = ReactDOM.findDOMNode(this).ownerDocument;
+	    doc.removeEventListener('mousemove', this._onMove);
+	    doc.removeEventListener('mouseup', this._onUp);
+	    this.props.onStop();
+	  }
 
+	  render() {
+	    return React.createElement('div', {
+	      style: this.props.style,
+	      onMouseDown: this._startDragging.bind(this)
+	    });
+	  }
+	}
 
-
-
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-
-
-	class Draggable extends React.Component{
-
-
-
-
-
-
-
-
-
-	componentDidMount(){
-	this._onMove=this.onMove.bind(this);
-	this._onUp=this.onUp.bind(this);}
-
-
-	_startDragging(evt){
-	evt.preventDefault();
-	var doc=ReactDOM.findDOMNode(this).ownerDocument;
-	doc.addEventListener('mousemove',this._onMove);
-	doc.addEventListener('mouseup',this._onUp);
-	this.props.onStart();}
-
-
-	onMove(evt){
-	evt.preventDefault();
-	this.props.onMove(evt.pageX,evt.pageY);}
-
-
-	onUp(evt){
-	evt.preventDefault();
-	var doc=ReactDOM.findDOMNode(this).ownerDocument;
-	doc.removeEventListener('mousemove',this._onMove);
-	doc.removeEventListener('mouseup',this._onUp);
-	this.props.onStop();}
-
-
-	render(){
-	return (
-	React.createElement('div',{
-	style:this.props.style,
-	onMouseDown:this._startDragging.bind(this)}));}}
-
-
-
-
-
-	module.exports=Draggable;
+	module.exports = Draggable;
 
 /***/ },
 /* 168 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var assign = __webpack_require__(2);
 
+	class HighlightHover extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = { hover: false };
+	  }
 
+	  render() {
+	    return React.createElement(
+	      'div',
+	      {
+	        onMouseOver: () => !this.state.hover && this.setState({ hover: true }),
+	        onMouseOut: () => this.state.hover && this.setState({ hover: false }),
+	        style: assign({}, this.props.style, {
+	          backgroundColor: this.state.hover ? '#eee' : 'transparent'
+	        }) },
+	      this.props.children
+	    );
+	  }
+	}
 
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var assign=__webpack_require__(2);
-
-
-
-
-
-
-
-
-
-
-	class HighlightHover extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={hover:false};}
-
-
-	render(){
-	return (
-	React.createElement('div',{
-	onMouseOver:() => !this.state.hover&&this.setState({hover:true}),
-	onMouseOut:() => this.state.hover&&this.setState({hover:false}),
-	style:assign({},this.props.style,{
-	backgroundColor:this.state.hover?'#eee':'transparent'})},
-
-	this.props.children));}}
-
-
-
-
-
-	module.exports=HighlightHover;
+	module.exports = HighlightHover;
 
 /***/ },
 /* 169 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-
-	var assign=__webpack_require__(2);
-	var decorate=__webpack_require__(7);
-	var Props=__webpack_require__(173);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Node extends React.Component{
-
-
-
-
-
-
-
-	shouldComponentUpdate(nextProps){
-	return nextProps!==this.props;}
-
-
-	componentDidMount(){
-	if(this.props.selected){
-	this.ensureInView();}}
-
-
-
-	componentDidUpdate(prevProps){
-	if(this.props.selected&&!prevProps.selected){
-	this.ensureInView();}}
-
-
-
-	ensureInView(){
-	var node=this.props.isBottomTagSelected?this._tail:this._head;
-	if(!node){
-	return;}
-
-	this.context.scrollTo(node.offsetTop,node.offsetHeight);}
-
-
-	render(){
-	var node=this.props.node;
-	if(!node){
-	return React.createElement('span',null,'Node was deleted');}
-
-	var children=node.get('children');
-
-	if(node.get('nodeType')==='Wrapper'){
-	return React.createElement(WrappedNode,{id:children[0],depth:this.props.depth});}
-
-
-	if(node.get('nodeType')==='NativeWrapper'){
-	children=this.props.wrappedChildren;}
-
-
-	var collapsed=node.get('collapsed');
-
-	var leftPad={
-	paddingLeft:(this.props.depth+1)*10};
-
-	var headStyles=assign(
-	{},
-	styles.head,
-	this.props.hovered&&styles.headHover,
-	this.props.selected&&(collapsed||!this.props.isBottomTagSelected)&&styles.headSelect,
-	leftPad);
-
-
-	var tagEvents={
-	onMouseOver:() => this.props.onHover(true),
-	onMouseOut:() => this.props.onHover(false),
-	onContextMenu:this.props.onContextMenu,
-	onDoubleClick:this.props.onToggleCollapse,
-	onMouseDown:this.props.onSelect};
-
-
-	var nodeType=node.get('nodeType');
-	if(nodeType==='Text'||nodeType==='Empty'){
-	var tag;
-	if(nodeType==='Text'){
-	var text=node.get('text');
-	tag=
-	React.createElement('span',{style:styles.tagText},
-	React.createElement('span',{style:styles.openTag},'"'),
-
-
-	React.createElement('span',{style:styles.textContent},text),
-	React.createElement('span',{style:styles.closeTag},'"'));}else 
-
-
-
-	if(nodeType==='Empty'){
-	tag=
-	React.createElement('span',{style:styles.tagText},
-	React.createElement('span',{style:styles.falseyLiteral},'null'));}
-
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('div',(0,_extends3.default)({style:headStyles,ref:h => this._head=h},tagEvents),
-	tag)));}
-
-
-
-
-
-	var isCustom=nodeType==='Composite';
-
-	var tagStyle=isCustom?styles.customTagName:styles.tagName;
-
-
-	if(!children||typeof children==='string'||!children.length){
-	var name=node.get('name');
-	var content=children;
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('div',(0,_extends3.default)({style:headStyles,ref:h => this._head=h},tagEvents),
-	React.createElement('span',{style:styles.tagText},
-	React.createElement('span',{style:styles.openTag},
-	React.createElement('span',{style:tagStyle},'<',name),
-	node.get('props')&&React.createElement(Props,{props:node.get('props')}),
-	!content&&'/',
-	React.createElement('span',{style:tagStyle},'>')),
-
-	content&&[
-	React.createElement('span',{key:'content',style:styles.textContent},content),
-	React.createElement('span',{key:'close',style:styles.closeTag},
-	React.createElement('span',{style:tagStyle},'</',name,'>'))]))));}
-
-
-
-
-
-
-
-
-
-	if(typeof children==='string'){
-	return React.createElement('div',{style:leftPad},children);}
-
-
-	var closeTag=
-	React.createElement('span',{style:styles.closeTag},
-	React.createElement('span',{style:tagStyle},'</',
-	''+node.get('name'),'>'));
-
-
-
-
-	var hasState=!!node.get('state')||!!node.get('context');
-
-	var collapserStyle=assign(
-	{},
-	styles.collapser,
-	{left:leftPad.paddingLeft-12},
-	isCustom&&styles.customCollapser,
-	hasState&&{
-	color:'red'});
-
-
-
-	var head=
-	React.createElement('div',(0,_extends3.default)({ref:h => this._head=h,style:headStyles},tagEvents),
-	React.createElement('span',{
-	title:hasState&&'This component has state',
-	onClick:this.props.onToggleCollapse,style:collapserStyle},
-
-	node.get('collapsed')?React.createElement('span',null,'▶'):React.createElement('span',null,'▼')),
-
-	React.createElement('span',{style:styles.tagText},
-	React.createElement('span',{style:styles.openTag},
-	React.createElement('span',{style:tagStyle},'<',''+node.get('name')),
-	node.get('props')&&React.createElement(Props,{props:node.get('props')}),
-	React.createElement('span',{style:tagStyle},'>')),
-
-	collapsed&&'…',
-	collapsed&&closeTag));
-
-
-
-
-	if(collapsed){
-	return (
-	React.createElement('div',{style:styles.container},
-	head));}
-
-
-
-
-	var tailStyles=assign(
-	{},
-	styles.tail,
-	this.props.hovered&&styles.headHover,
-	this.props.selected&&this.props.isBottomTagSelected&&styles.headSelect,
-	leftPad);
-
-
-	return (
-	React.createElement('div',{style:styles.container},
-	head,
-	React.createElement('div',{style:styles.children},
-	children.map(id => React.createElement(WrappedNode,{key:id,depth:this.props.depth+1,id:id}))),
-
-	React.createElement('div',(0,_extends3.default)({ref:t => this._tail=t,style:tailStyles},tagEvents,{onMouseDown:this.props.onSelectBottom}),
-	closeTag)));}}
-
-
-
-
-
-
-	Node.contextTypes={
-	scrollTo:React.PropTypes.func};
-
-
-	var WrappedNode=decorate({
-	listeners(props){
-	return [props.id];},
-
-	props(store,props){
-	var node=store.get(props.id);
-	var wrappedChildren=null;
-	if(node&&node.get('nodeType')==='NativeWrapper'){
-	var child=store.get(node.get('children')[0]);
-	wrappedChildren=child&&child.get('children');}
-
-	return {
-	node,
-	wrappedChildren,
-	selected:store.selected===props.id,
-	isBottomTagSelected:store.isBottomTagSelected,
-	hovered:store.hovered===props.id,
-	onToggleCollapse:e => {
-	e.preventDefault();
-	store.toggleCollapse(props.id);},
-
-	onHover:isHovered => store.setHover(props.id,isHovered),
-	onSelect:e => {
-	store.selectTop(props.id);},
-
-	onSelectBottom:e => {
-	store.selectBottom(props.id);},
-
-	onContextMenu:e => {
-	store.showContextMenu('tree',e,props.id,node);}};},
-
-
-
-	shouldUpdate(nextProps,prevProps){
-	return nextProps.id!==prevProps.id;}},
-
-	Node);
-
-	var styles={
-
-
-
-	container:{},
-
-
-	children:{},
-
-
-	textContent:{},
-
-
-	falseyLiteral:{
-	fontStyle:'italic'},
-
-
-	closeTag:{},
-
-
-	head:{
-	cursor:'pointer',
-	position:'relative',
-	display:'flex'},
-
-
-	tail:{
-	cursor:'pointer'},
-
-
-	tagName:{
-	color:'rgb(120, 120, 120)'},
-
-
-	customTagName:{
-	color:'rgb(136, 18, 128)'},
-
-
-	openTag:{},
-
-
-	tagText:{
-	flex:1,
-	whiteSpace:'nowrap'},
-
-
-	headSelect:{
-	backgroundColor:'#ccc'},
-
-
-	collapser:{
-	fontSize:7,
-	color:'#aaa',
-	marginRight:3,
-	position:'absolute',
-	padding:2},
-
-
-	customCollapser:{
-	color:'#555',
-	fontSize:9},
-
-
-	headHover:{
-	backgroundColor:'#eee'}};
-
-
-
-	module.exports=WrappedNode;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _extends2 = __webpack_require__(21);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var React = __webpack_require__(3);
+
+	var assign = __webpack_require__(2);
+	var decorate = __webpack_require__(7);
+	var Props = __webpack_require__(173);
+
+	class Node extends React.Component {
+
+	  shouldComponentUpdate(nextProps) {
+	    return nextProps !== this.props;
+	  }
+
+	  componentDidMount() {
+	    if (this.props.selected) {
+	      this.ensureInView();
+	    }
+	  }
+
+	  componentDidUpdate(prevProps) {
+	    if (this.props.selected && !prevProps.selected) {
+	      this.ensureInView();
+	    }
+	  }
+
+	  ensureInView() {
+	    var node = this.props.isBottomTagSelected ? this._tail : this._head;
+	    if (!node) {
+	      return;
+	    }
+	    this.context.scrollTo(node.offsetTop, node.offsetHeight);
+	  }
+
+	  render() {
+	    var node = this.props.node;
+	    if (!node) {
+	      return React.createElement(
+	        'span',
+	        null,
+	        'Node was deleted'
+	      );
+	    }
+	    var children = node.get('children');
+
+	    if (node.get('nodeType') === 'Wrapper') {
+	      return React.createElement(WrappedNode, { id: children[0], depth: this.props.depth });
+	    }
+
+	    if (node.get('nodeType') === 'NativeWrapper') {
+	      children = this.props.wrappedChildren;
+	    }
+
+	    var collapsed = node.get('collapsed');
+
+	    var leftPad = {
+	      paddingLeft: (this.props.depth + 1) * 10
+	    };
+	    var headStyles = assign({}, styles.head, this.props.hovered && styles.headHover, this.props.selected && (collapsed || !this.props.isBottomTagSelected) && styles.headSelect, leftPad);
+
+	    var tagEvents = {
+	      onMouseOver: () => this.props.onHover(true),
+	      onMouseOut: () => this.props.onHover(false),
+	      onContextMenu: this.props.onContextMenu,
+	      onDoubleClick: this.props.onToggleCollapse,
+	      onMouseDown: this.props.onSelect
+	    };
+
+	    var nodeType = node.get('nodeType');
+	    if (nodeType === 'Text' || nodeType === 'Empty') {
+	      var tag;
+	      if (nodeType === 'Text') {
+	        var text = node.get('text');
+	        tag = React.createElement(
+	          'span',
+	          { style: styles.tagText },
+	          React.createElement(
+	            'span',
+	            { style: styles.openTag },
+	            '"'
+	          ),
+	          React.createElement(
+	            'span',
+	            { style: styles.textContent },
+	            text
+	          ),
+	          React.createElement(
+	            'span',
+	            { style: styles.closeTag },
+	            '"'
+	          )
+	        );
+	      } else if (nodeType === 'Empty') {
+	        tag = React.createElement(
+	          'span',
+	          { style: styles.tagText },
+	          React.createElement(
+	            'span',
+	            { style: styles.falseyLiteral },
+	            'null'
+	          )
+	        );
+	      }
+	      return React.createElement(
+	        'div',
+	        { style: styles.container },
+	        React.createElement(
+	          'div',
+	          (0, _extends3.default)({ style: headStyles, ref: h => this._head = h }, tagEvents),
+	          tag
+	        )
+	      );
+	    }
+
+	    var isCustom = nodeType === 'Composite';
+
+	    var tagStyle = isCustom ? styles.customTagName : styles.tagName;
+
+	    // Single-line tag (collapsed / simple content / no content)
+	    if (!children || typeof children === 'string' || !children.length) {
+	      var name = node.get('name');
+	      var content = children;
+	      return React.createElement(
+	        'div',
+	        { style: styles.container },
+	        React.createElement(
+	          'div',
+	          (0, _extends3.default)({ style: headStyles, ref: h => this._head = h }, tagEvents),
+	          React.createElement(
+	            'span',
+	            { style: styles.tagText },
+	            React.createElement(
+	              'span',
+	              { style: styles.openTag },
+	              React.createElement(
+	                'span',
+	                { style: tagStyle },
+	                '<',
+	                name
+	              ),
+	              node.get('props') && React.createElement(Props, { props: node.get('props') }),
+	              !content && '/',
+	              React.createElement(
+	                'span',
+	                { style: tagStyle },
+	                '>'
+	              )
+	            ),
+	            content && [React.createElement(
+	              'span',
+	              { key: 'content', style: styles.textContent },
+	              content
+	            ), React.createElement(
+	              'span',
+	              { key: 'close', style: styles.closeTag },
+	              React.createElement(
+	                'span',
+	                { style: tagStyle },
+	                '</',
+	                name,
+	                '>'
+	              )
+	            )]
+	          )
+	        )
+	      );
+	    }
+
+	    // Plain string
+	    if (typeof children === 'string') {
+	      return React.createElement(
+	        'div',
+	        { style: leftPad },
+	        children
+	      );
+	    }
+
+	    var closeTag = React.createElement(
+	      'span',
+	      { style: styles.closeTag },
+	      React.createElement(
+	        'span',
+	        { style: tagStyle },
+	        '</',
+	        '' + node.get('name'),
+	        '>'
+	      )
+	    );
+
+	    var hasState = !!node.get('state') || !!node.get('context');
+
+	    var collapserStyle = assign({}, styles.collapser, { left: leftPad.paddingLeft - 12 }, isCustom && styles.customCollapser, hasState && {
+	      color: 'red'
+	    });
+
+	    var head = React.createElement(
+	      'div',
+	      (0, _extends3.default)({ ref: h => this._head = h, style: headStyles }, tagEvents),
+	      React.createElement(
+	        'span',
+	        {
+	          title: hasState && 'This component has state',
+	          onClick: this.props.onToggleCollapse, style: collapserStyle
+	        },
+	        node.get('collapsed') ? React.createElement(
+	          'span',
+	          null,
+	          '▶'
+	        ) : React.createElement(
+	          'span',
+	          null,
+	          '▼'
+	        )
+	      ),
+	      React.createElement(
+	        'span',
+	        { style: styles.tagText },
+	        React.createElement(
+	          'span',
+	          { style: styles.openTag },
+	          React.createElement(
+	            'span',
+	            { style: tagStyle },
+	            '<',
+	            '' + node.get('name')
+	          ),
+	          node.get('props') && React.createElement(Props, { props: node.get('props') }),
+	          React.createElement(
+	            'span',
+	            { style: tagStyle },
+	            '>'
+	          )
+	        ),
+	        collapsed && '…',
+	        collapsed && closeTag
+	      )
+	    );
+
+	    if (collapsed) {
+	      return React.createElement(
+	        'div',
+	        { style: styles.container },
+	        head
+	      );
+	    }
+
+	    var tailStyles = assign({}, styles.tail, this.props.hovered && styles.headHover, this.props.selected && this.props.isBottomTagSelected && styles.headSelect, leftPad);
+
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      head,
+	      React.createElement(
+	        'div',
+	        { style: styles.children },
+	        children.map(id => React.createElement(WrappedNode, { key: id, depth: this.props.depth + 1, id: id }))
+	      ),
+	      React.createElement(
+	        'div',
+	        (0, _extends3.default)({ ref: t => this._tail = t, style: tailStyles }, tagEvents, { onMouseDown: this.props.onSelectBottom }),
+	        closeTag
+	      )
+	    );
+	  }
+	}
+
+	Node.contextTypes = {
+	  scrollTo: React.PropTypes.func
+	};
+
+	var WrappedNode = decorate({
+	  listeners(props) {
+	    return [props.id];
+	  },
+	  props(store, props) {
+	    var node = store.get(props.id);
+	    var wrappedChildren = null;
+	    if (node && node.get('nodeType') === 'NativeWrapper') {
+	      var child = store.get(node.get('children')[0]);
+	      wrappedChildren = child && child.get('children');
+	    }
+	    return {
+	      node,
+	      wrappedChildren,
+	      selected: store.selected === props.id,
+	      isBottomTagSelected: store.isBottomTagSelected,
+	      hovered: store.hovered === props.id,
+	      onToggleCollapse: e => {
+	        e.preventDefault();
+	        store.toggleCollapse(props.id);
+	      },
+	      onHover: isHovered => store.setHover(props.id, isHovered),
+	      onSelect: e => {
+	        store.selectTop(props.id);
+	      },
+	      onSelectBottom: e => {
+	        store.selectBottom(props.id);
+	      },
+	      onContextMenu: e => {
+	        store.showContextMenu('tree', e, props.id, node);
+	      }
+	    };
+	  },
+	  shouldUpdate(nextProps, prevProps) {
+	    return nextProps.id !== prevProps.id;
+	  }
+	}, Node);
+
+	var styles = {
+	  // TODO(jared): how do people feel about empty style rules? I put them here
+	  // in case we need them later, and the corresponding divs refernce them. But
+	  // I could remove them if desired.
+	  container: {},
+
+	  children: {},
+
+	  textContent: {},
+
+	  falseyLiteral: {
+	    fontStyle: 'italic'
+	  },
+
+	  closeTag: {},
+
+	  head: {
+	    cursor: 'pointer',
+	    position: 'relative',
+	    display: 'flex'
+	  },
+
+	  tail: {
+	    cursor: 'pointer'
+	  },
+
+	  tagName: {
+	    color: 'rgb(120, 120, 120)'
+	  },
+
+	  customTagName: {
+	    color: 'rgb(136, 18, 128)'
+	  },
+
+	  openTag: {},
+
+	  tagText: {
+	    flex: 1,
+	    whiteSpace: 'nowrap'
+	  },
+
+	  headSelect: {
+	    backgroundColor: '#ccc'
+	  },
+
+	  collapser: {
+	    fontSize: 7,
+	    color: '#aaa',
+	    marginRight: 3,
+	    position: 'absolute',
+	    padding: 2
+	  },
+
+	  customCollapser: {
+	    color: '#555',
+	    fontSize: 9
+	  },
+
+	  headHover: {
+	    backgroundColor: '#eee'
+	  }
+	};
+
+	module.exports = WrappedNode;
 
 /***/ },
 /* 170 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var Container=__webpack_require__(163);
-	var Store=__webpack_require__(176);
-	var keyboardNav=__webpack_require__(180);
-	var invariant=__webpack_require__(41);
-	var assign=__webpack_require__(2);
-
-	var Bridge=__webpack_require__(156);
-	var NativeStyler=__webpack_require__(186);
-	var RelayPlugin=__webpack_require__(193);
-
-	var consts=__webpack_require__(20);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Panel extends React.Component{
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={loading:true,isReact:this.props.alreadyFoundReact};
-	this._unMounted=false;
-	window.panel=this;
-	this.plugins=[];}
-
-
-	getChildContext(){
-	return {
-	store:this._store};}
-
-
-
-	componentDidMount(){
-	if(this.props.alreadyFoundReact){
-	this.inject();}else 
-	{
-	this.lookForReact();}
-
-
-	if(this.props.reloadSubscribe){
-	this._unsub=this.props.reloadSubscribe(() => this.reload());}}
-
-
-
-	componentWillUnmount(){
-	this._unMounted=true;
-	if(this._unsub){
-	this._unsub();}}
-
-
-
-	pauseTransfer(){
-	if(this._bridge){
-	this._bridge.pause();}}
-
-
-
-	resumeTransfer(){
-	if(this._bridge){
-	this._bridge.resume();}}
-
-
-
-	reload(){
-	if(this._unsub){
-	this._unsub();}
-
-	this.teardown();
-	if(!this._unMounted){
-	this.setState({loading:true},this.props.reload);}}
-
-
-
-	getNewSelection(){
-	if(!this._bridge||!this.props.getNewSelection){
-	return;}
-
-	this.props.getNewSelection(this._bridge);}
-
-
-	hideHighlight(){
-	this._store.hideHighlight();}
-
-
-	sendSelection(id){
-	if(!this._bridge||!id&&!this._store.selected){
-	return;}
-
-	invariant(this.props.selectElement,'cannot send selection if props.selectElement is not defined');
-
-	this.props.selectElement(id||this._store.selected,this._bridge);}
-
-
-	inspectComponent(vbl){
-	invariant(this.props.showComponentSource,'cannot inspect component if props.showComponentSource is not supplied');
-	this.props.showComponentSource(vbl||'$r');}
-
-
-	viewSource(id){
-	if(!this._bridge){
-	return;}
-
-	this._bridge.send('putSelectedInstance',id);
-	setTimeout(() => {
-	invariant(this.props.showComponentSource,'cannot view source if props.showComponentSource is not supplied');
-	this.props.showComponentSource('__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst');},
-	100);}
-
-
-	teardown(){
-	this.plugins.forEach(p => p.teardown());
-	this.plugins=[];
-	if(this._keyListener){
-	window.removeEventListener('keydown',this._keyListener);
-	this._keyListener=null;}
-
-	if(this._bridge){
-	this._bridge.send('shutdown');}
-
-	if(this._teardownWall){
-	this._teardownWall();
-	this._teardownWall=null;}}
-
-
-
-	inject(){
-	this.props.inject((wall,teardown) => {
-	this._teardownWall=teardown;
-
-	this._bridge=new Bridge(wall);
-
-	this._store=new Store(this._bridge);
-	var refresh=() => this.forceUpdate();
-	this.plugins=[
-	new RelayPlugin(this._store,this._bridge,refresh)];
-
-	this._keyListener=keyboardNav(this._store,window);
-
-	window.addEventListener('keydown',this._keyListener);
-
-	this._store.on('connected',() => {
-	this.setState({loading:false});
-	this.getNewSelection();});});}
-
-
-
-
-	componentDidUpdate(){
-	if(!this.state.isReact){
-	if(!this._checkTimeout){
-	this._checkTimeout=setTimeout(() => {
-	this._checkTimeout=null;
-	this.lookForReact();},
-	200);}}}
-
-
-
-
-	lookForReact(){
-	if(typeof this.props.checkForReact!=='function'){
-	return;}
-
-	this.props.checkForReact(isReact => {
-	if(isReact){
-	this.setState({isReact:true,loading:true});
-	this.inject();}else 
-	{
-
-	this.setState({isReact:false,loading:false});}});}
-
-
-
-
-	render(){
-	if(this.state.loading){
-
-
-
-
-	return (
-	React.createElement('div',{style:styles.loading},
-	React.createElement('h1',null,'Connecting to React...'),
-	React.createElement('br',null),'If this is React Native, you need to interact with the app (just tap the screen) in order to establish the bridge.'));}
-
-
-
-
-	if(!this.state.isReact){
-	return React.createElement('div',{style:styles.loading},React.createElement('h1',null,'Looking for React...'));}
-
-	var extraTabs=assign.apply(null,[{}].concat(this.plugins.map(p => p.tabs())));
-	var extraPanes=[].concat(...this.plugins.map(p => p.panes()));
-	if(this._store.capabilities.rnStyle){
-	extraPanes.push(panelRNStyle(this._bridge));}
-
-	return (
-	React.createElement(Container,{
-	reload:this.props.reload&&this.reload.bind(this),
-	menuItems:{
-	attr:(id,node,val,path,name) => {
-	if(!val||node.get('nodeType')!=='Composite'||val[consts.type]!=='function'){
-	return undefined;}
-
-	return [this.props.showAttrSource&&{
-	title:'Show Source',
-
-	action:() => this.props.showAttrSource(path)},
-	this.props.executeFn&&{
-	title:'Execute function',
-
-	action:() => this.props.executeFn(path)}];},
-
-
-	tree:(id,node) => {
-	return [this.props.showComponentSource&&node.get('nodeType')==='Composite'&&{
-	title:'Show Source',
-	action:() => this.viewSource(id)},
-	this.props.selectElement&&this._store.capabilities.dom&&{
-	title:'Show in Elements Pane',
-	action:() => this.sendSelection(id)}];}},
-
-
-
-	extraPanes:extraPanes,
-	extraTabs:extraTabs}));}}
-
-
-
-
-
-	Panel.childContextTypes={
-	store:React.PropTypes.object};
-
-
-	var panelRNStyle=bridge => (node,id) => {
-	var props=node.get('props');
-	if(!props||!props.style){
-	return React.createElement('strong',null,'No style');}
-
-	return (
-	React.createElement('div',null,
-	React.createElement('h3',null,'React Native Style Editor'),
-	React.createElement(NativeStyler,{id:id,bridge:bridge})));};
-
-
-
-
-	var styles={
-	chromePane:{
-	display:'flex'},
-
-	stretch:{
-	flex:1},
-
-	loading:{
-	textAlign:'center',
-	color:'#888',
-	padding:30,
-	flex:1}};
-
-
-
-	module.exports=Panel;
+	var React = __webpack_require__(3);
+	var Container = __webpack_require__(163);
+	var Store = __webpack_require__(176);
+	var keyboardNav = __webpack_require__(180);
+	var invariant = __webpack_require__(41);
+	var assign = __webpack_require__(2);
+
+	var Bridge = __webpack_require__(156);
+	var NativeStyler = __webpack_require__(186);
+	var RelayPlugin = __webpack_require__(193);
+
+	var consts = __webpack_require__(20);
+
+	class Panel extends React.Component {
+	  // TODO: typecheck plugin interface
+
+
+	  constructor(props) {
+	    super(props);
+	    this.state = { loading: true, isReact: this.props.alreadyFoundReact };
+	    this._unMounted = false;
+	    window.panel = this;
+	    this.plugins = [];
+	  }
+
+	  getChildContext() {
+	    return {
+	      store: this._store
+	    };
+	  }
+
+	  componentDidMount() {
+	    if (this.props.alreadyFoundReact) {
+	      this.inject();
+	    } else {
+	      this.lookForReact();
+	    }
+
+	    if (this.props.reloadSubscribe) {
+	      this._unsub = this.props.reloadSubscribe(() => this.reload());
+	    }
+	  }
+
+	  componentWillUnmount() {
+	    this._unMounted = true;
+	    if (this._unsub) {
+	      this._unsub();
+	    }
+	  }
+
+	  pauseTransfer() {
+	    if (this._bridge) {
+	      this._bridge.pause();
+	    }
+	  }
+
+	  resumeTransfer() {
+	    if (this._bridge) {
+	      this._bridge.resume();
+	    }
+	  }
+
+	  reload() {
+	    if (this._unsub) {
+	      this._unsub();
+	    }
+	    this.teardown();
+	    if (!this._unMounted) {
+	      this.setState({ loading: true }, this.props.reload);
+	    }
+	  }
+
+	  getNewSelection() {
+	    if (!this._bridge || !this.props.getNewSelection) {
+	      return;
+	    }
+	    this.props.getNewSelection(this._bridge);
+	  }
+
+	  hideHighlight() {
+	    this._store.hideHighlight();
+	  }
+
+	  sendSelection(id) {
+	    if (!this._bridge || !id && !this._store.selected) {
+	      return;
+	    }
+	    invariant(this.props.selectElement, 'cannot send selection if props.selectElement is not defined');
+	    // $FlowFixMe either id or this._store.selected is a string
+	    this.props.selectElement(id || this._store.selected, this._bridge);
+	  }
+
+	  inspectComponent(vbl) {
+	    invariant(this.props.showComponentSource, 'cannot inspect component if props.showComponentSource is not supplied');
+	    this.props.showComponentSource(vbl || '$r');
+	  }
+
+	  viewSource(id) {
+	    if (!this._bridge) {
+	      return;
+	    }
+	    this._bridge.send('putSelectedInstance', id);
+	    setTimeout(() => {
+	      invariant(this.props.showComponentSource, 'cannot view source if props.showComponentSource is not supplied');
+	      this.props.showComponentSource('__REACT_DEVTOOLS_GLOBAL_HOOK__.$inst');
+	    }, 100);
+	  }
+
+	  teardown() {
+	    this.plugins.forEach(p => p.teardown());
+	    this.plugins = [];
+	    if (this._keyListener) {
+	      window.removeEventListener('keydown', this._keyListener);
+	      this._keyListener = null;
+	    }
+	    if (this._bridge) {
+	      this._bridge.send('shutdown');
+	    }
+	    if (this._teardownWall) {
+	      this._teardownWall();
+	      this._teardownWall = null;
+	    }
+	  }
+
+	  inject() {
+	    this.props.inject((wall, teardown) => {
+	      this._teardownWall = teardown;
+
+	      this._bridge = new Bridge(wall);
+
+	      this._store = new Store(this._bridge);
+	      var refresh = () => this.forceUpdate();
+	      this.plugins = [new RelayPlugin(this._store, this._bridge, refresh)];
+	      this._keyListener = keyboardNav(this._store, window);
+
+	      window.addEventListener('keydown', this._keyListener);
+
+	      this._store.on('connected', () => {
+	        this.setState({ loading: false });
+	        this.getNewSelection();
+	      });
+	    });
+	  }
+
+	  componentDidUpdate() {
+	    if (!this.state.isReact) {
+	      if (!this._checkTimeout) {
+	        this._checkTimeout = setTimeout(() => {
+	          this._checkTimeout = null;
+	          this.lookForReact();
+	        }, 200);
+	      }
+	    }
+	  }
+
+	  lookForReact() {
+	    if (typeof this.props.checkForReact !== 'function') {
+	      return;
+	    }
+	    this.props.checkForReact(isReact => {
+	      if (isReact) {
+	        this.setState({ isReact: true, loading: true });
+	        this.inject();
+	      } else {
+	        this.setState({ isReact: false, loading: false });
+	      }
+	    });
+	  }
+
+	  render() {
+	    if (this.state.loading) {
+	      // TODO: This currently shows in the Firefox shell when navigating from a
+	      // React page to a non-React page. We should show a better message but
+	      // properly doing so probably requires refactoring how we load the panel
+	      // and communicate with the bridge.
+	      return React.createElement(
+	        'div',
+	        { style: styles.loading },
+	        React.createElement(
+	          'h1',
+	          null,
+	          'Connecting to React...'
+	        ),
+	        React.createElement('br', null),
+	        'If this is React Native, you need to interact with the app (just tap the screen) in order to establish the bridge.'
+	      );
+	    }
+	    if (!this.state.isReact) {
+	      return React.createElement(
+	        'div',
+	        { style: styles.loading },
+	        React.createElement(
+	          'h1',
+	          null,
+	          'Looking for React...'
+	        )
+	      );
+	    }
+	    var extraTabs = assign.apply(null, [{}].concat(this.plugins.map(p => p.tabs())));
+	    var extraPanes = [].concat(...this.plugins.map(p => p.panes()));
+	    if (this._store.capabilities.rnStyle) {
+	      extraPanes.push(panelRNStyle(this._bridge));
+	    }
+	    return React.createElement(Container, {
+	      reload: this.props.reload && this.reload.bind(this),
+	      menuItems: {
+	        attr: (id, node, val, path, name) => {
+	          if (!val || node.get('nodeType') !== 'Composite' || val[consts.type] !== 'function') {
+	            return undefined;
+	          }
+	          return [this.props.showAttrSource && {
+	            title: 'Show Source',
+	            // $FlowFixMe showAttrSource is provided
+	            action: () => this.props.showAttrSource(path)
+	          }, this.props.executeFn && {
+	            title: 'Execute function',
+	            // $FlowFixMe executeFn is provided
+	            action: () => this.props.executeFn(path)
+	          }];
+	        },
+	        tree: (id, node) => {
+	          return [this.props.showComponentSource && node.get('nodeType') === 'Composite' && {
+	            title: 'Show Source',
+	            action: () => this.viewSource(id)
+	          }, this.props.selectElement && this._store.capabilities.dom && {
+	            title: 'Show in Elements Pane',
+	            action: () => this.sendSelection(id)
+	          }];
+	        }
+	      },
+	      extraPanes: extraPanes,
+	      extraTabs: extraTabs
+	    });
+	  }
+	}
+
+	Panel.childContextTypes = {
+	  store: React.PropTypes.object
+	};
+
+	var panelRNStyle = bridge => (node, id) => {
+	  var props = node.get('props');
+	  if (!props || !props.style) {
+	    return React.createElement(
+	      'strong',
+	      null,
+	      'No style'
+	    );
+	  }
+	  return React.createElement(
+	    'div',
+	    null,
+	    React.createElement(
+	      'h3',
+	      null,
+	      'React Native Style Editor'
+	    ),
+	    React.createElement(NativeStyler, { id: id, bridge: bridge })
+	  );
+	};
+
+	var styles = {
+	  chromePane: {
+	    display: 'flex'
+	  },
+	  stretch: {
+	    flex: 1
+	  },
+	  loading: {
+	    textAlign: 'center',
+	    color: '#888',
+	    padding: 30,
+	    flex: 1
+	  }
+	};
+
+	module.exports = Panel;
 
 /***/ },
 /* 171 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var BlurInput = __webpack_require__(161);
+	var DataView = __webpack_require__(97);
+	var DetailPane = __webpack_require__(99);
+	var DetailPaneSection = __webpack_require__(100);
+	var React = __webpack_require__(3);
 
+	var decorate = __webpack_require__(7);
+	var invariant = __webpack_require__(41);
 
+	class PropState extends React.Component {
+	  getChildContext() {
+	    return {
+	      onChange: (path, val) => {
+	        this.props.onChange(path, val);
+	      }
+	    };
+	  }
 
+	  render() {
+	    if (!this.props.node) {
+	      // TODO(jared): style this
+	      return React.createElement(
+	        'span',
+	        null,
+	        'No selection'
+	      );
+	    }
 
+	    var nodeType = this.props.node.get('nodeType');
 
+	    if (nodeType === 'Text') {
+	      if (this.props.canEditTextContent) {
+	        return React.createElement(
+	          DetailPane,
+	          null,
+	          React.createElement(BlurInput, {
+	            value: this.props.node.get('text'),
+	            onChange: this.props.onChangeText
+	          })
+	        );
+	      }
+	      return React.createElement(
+	        DetailPane,
+	        { header: 'Text Node' },
+	        'No props/state.'
+	      );
+	    } else if (nodeType === 'Empty') {
+	      return React.createElement(
+	        DetailPane,
+	        { header: 'Empty Node' },
+	        'No props/state.'
+	      );
+	    }
 
+	    var editTextContent = null;
+	    if (this.props.canEditTextContent) {
+	      if (typeof this.props.node.get('children') === 'string') {
+	        editTextContent = React.createElement(BlurInput, {
+	          value: this.props.node.get('children'),
+	          onChange: this.props.onChangeText
+	        });
+	      }
+	    }
 
+	    var state = this.props.node.get('state');
+	    var context = this.props.node.get('context');
+	    var propsReadOnly = !this.props.node.get('canUpdate');
 
+	    return React.createElement(
+	      DetailPane,
+	      {
+	        header: '<' + this.props.node.get('name') + '>',
+	        hint: '($r in the console)' },
+	      editTextContent,
+	      React.createElement(
+	        DetailPaneSection,
+	        {
+	          hint: propsReadOnly ? 'read-only' : null,
+	          title: 'Props' },
+	        React.createElement(DataView, {
+	          path: ['props'],
+	          readOnly: propsReadOnly,
+	          inspect: this.props.inspect,
+	          showMenu: this.props.showMenu,
+	          key: this.props.id + '-props',
+	          data: this.props.node.get('props')
+	        })
+	      ),
+	      state && React.createElement(
+	        DetailPaneSection,
+	        { title: 'State' },
+	        React.createElement(DataView, {
+	          data: state,
+	          path: ['state'],
+	          inspect: this.props.inspect,
+	          showMenu: this.props.showMenu,
+	          key: this.props.id + '-state'
+	        })
+	      ),
+	      context && React.createElement(
+	        DetailPaneSection,
+	        { title: 'Context' },
+	        React.createElement(DataView, {
+	          data: context,
+	          path: ['context'],
+	          inspect: this.props.inspect,
+	          showMenu: this.props.showMenu,
+	          key: this.props.id + '-context'
+	        })
+	      ),
+	      this.props.extraPanes && this.props.extraPanes.map(fn => fn && fn(this.props.node, this.props.id))
+	    );
+	  }
+	}
 
+	PropState.childContextTypes = {
+	  onChange: React.PropTypes.func
+	};
 
-	var BlurInput=__webpack_require__(161);
-	var DataView=__webpack_require__(97);
-	var DetailPane=__webpack_require__(99);
-	var DetailPaneSection=__webpack_require__(100);
-	var React=__webpack_require__(3);
+	var WrappedPropState = decorate({
+	  listeners(props, store) {
+	    return ['selected', store.selected];
+	  },
 
-	var decorate=__webpack_require__(7);
-	var invariant=__webpack_require__(41);
+	  props(store) {
+	    var node = store.selected ? store.get(store.selected) : null;
+	    return {
+	      id: store.selected,
+	      node,
+	      canEditTextContent: store.capabilities.editTextContent,
+	      onChangeText(text) {
+	        store.changeTextContent(store.selected, text);
+	      },
+	      onChange(path, val) {
+	        if (path[0] === 'props') {
+	          store.setProps(store.selected, path.slice(1), val);
+	        } else if (path[0] === 'state') {
+	          store.setState(store.selected, path.slice(1), val);
+	        } else if (path[0] === 'context') {
+	          store.setContext(store.selected, path.slice(1), val);
+	        } else {
+	          invariant(false, 'the path to change() must start wth props, state, or context');
+	        }
+	      },
+	      showMenu(e, val, path, name) {
+	        store.showContextMenu('attr', e, store.selected, node, val, path, name);
+	      },
+	      inspect: store.inspect.bind(store, store.selected)
+	    };
+	  }
+	}, PropState);
 
-	class PropState extends React.Component{
-	getChildContext(){
-	return {
-	onChange:(path,val) => {
-	this.props.onChange(path,val);}};}
-
-
-
-
-	render(){
-	if(!this.props.node){
-
-	return React.createElement('span',null,'No selection');}
-
-
-	var nodeType=this.props.node.get('nodeType');
-
-	if(nodeType==='Text'){
-	if(this.props.canEditTextContent){
-	return (
-	React.createElement(DetailPane,null,
-	React.createElement(BlurInput,{
-	value:this.props.node.get('text'),
-	onChange:this.props.onChangeText})));}
-
-
-
-
-	return React.createElement(DetailPane,{header:'Text Node'},'No props/state.');}else 
-	if(nodeType==='Empty'){
-	return React.createElement(DetailPane,{header:'Empty Node'},'No props/state.');}
-
-
-	var editTextContent=null;
-	if(this.props.canEditTextContent){
-	if(typeof this.props.node.get('children')==='string'){
-	editTextContent=
-	React.createElement(BlurInput,{
-	value:this.props.node.get('children'),
-	onChange:this.props.onChangeText});}}
-
-
-
-
-
-	var state=this.props.node.get('state');
-	var context=this.props.node.get('context');
-	var propsReadOnly=!this.props.node.get('canUpdate');
-
-	return (
-	React.createElement(DetailPane,{
-	header:'<'+this.props.node.get('name')+'>',
-	hint:'($r in the console)'},
-	editTextContent,
-	React.createElement(DetailPaneSection,{
-	hint:propsReadOnly?'read-only':null,
-	title:'Props'},
-	React.createElement(DataView,{
-	path:['props'],
-	readOnly:propsReadOnly,
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	key:this.props.id+'-props',
-	data:this.props.node.get('props')})),
-
-
-
-	state&&
-	React.createElement(DetailPaneSection,{title:'State'},
-	React.createElement(DataView,{
-	data:state,
-	path:['state'],
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	key:this.props.id+'-state'})),
-
-
-	context&&
-	React.createElement(DetailPaneSection,{title:'Context'},
-	React.createElement(DataView,{
-	data:context,
-	path:['context'],
-	inspect:this.props.inspect,
-	showMenu:this.props.showMenu,
-	key:this.props.id+'-context'})),
-
-
-	this.props.extraPanes&&
-	this.props.extraPanes.map(fn => fn&&fn(this.props.node,this.props.id))));}}
-
-
-
-
-
-	PropState.childContextTypes={
-	onChange:React.PropTypes.func};
-
-
-	var WrappedPropState=decorate({
-	listeners(props,store){
-	return ['selected',store.selected];},
-
-
-	props(store){
-	var node=store.selected?store.get(store.selected):null;
-	return {
-	id:store.selected,
-	node,
-	canEditTextContent:store.capabilities.editTextContent,
-	onChangeText(text){
-	store.changeTextContent(store.selected,text);},
-
-	onChange(path,val){
-	if(path[0]==='props'){
-	store.setProps(store.selected,path.slice(1),val);}else 
-	if(path[0]==='state'){
-	store.setState(store.selected,path.slice(1),val);}else 
-	if(path[0]==='context'){
-	store.setContext(store.selected,path.slice(1),val);}else 
-	{
-	invariant(false,'the path to change() must start wth props, state, or context');}},
-
-
-	showMenu(e,val,path,name){
-	store.showContextMenu('attr',e,store.selected,node,val,path,name);},
-
-	inspect:store.inspect.bind(store,store.selected)};}},
-
-
-	PropState);
-
-	module.exports=WrappedPropState;
+	module.exports = WrappedPropState;
 
 /***/ },
 /* 172 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(36);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(36);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
 
+	var consts = __webpack_require__(20);
+	var createFragment = __webpack_require__(272);
+	var flash = __webpack_require__(101);
+	var valueStyles = __webpack_require__(59);
 
+	class PropVal extends React.Component {
+	  componentDidUpdate(prevProps) {
+	    if (this.props.val === prevProps.val) {
+	      return;
+	    }
+	    if (this.props.val && prevProps.val && typeof this.props.val === 'object' && typeof prevProps.val === 'object') {
+	      return;
+	    }
+	    var node = ReactDOM.findDOMNode(this);
+	    flash(node, 'rgba(0,255,0,1)', 'transparent', 1);
+	  }
 
+	  render() {
+	    return previewProp(this.props.val, !!this.props.nested);
+	  }
+	}
 
+	function previewProp(val, nested) {
+	  if (typeof val === 'number') {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.number },
+	      val
+	    );
+	  }
+	  if (typeof val === 'string') {
+	    if (val.length > 50) {
+	      val = val.slice(0, 50) + '…';
+	    }
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.string },
+	      '"',
+	      val,
+	      '"'
+	    );
+	  }
+	  if (typeof val === 'boolean') {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.bool },
+	      '' + val
+	    );
+	  }
+	  if (Array.isArray(val)) {
+	    if (nested) {
+	      return React.createElement(
+	        'span',
+	        { style: valueStyles.array },
+	        '[(',
+	        val.length,
+	        ')]'
+	      );
+	    }
+	    return previewArray(val);
+	  }
+	  if (!val) {
+	    return React.createElement(
+	      'span',
+	      { style: valueStyles.empty },
+	      '' + val
+	    );
+	  }
+	  if (typeof val !== 'object') {
+	    return React.createElement(
+	      'span',
+	      null,
+	      '…'
+	    );
+	  }
+	  if (val[consts.type]) {
+	    var type = val[consts.type];
+	    if (type === 'function') {
+	      return React.createElement(
+	        'span',
+	        { style: valueStyles.func },
+	        val[consts.name] || 'fn',
+	        '()'
+	      );
+	    }
+	    if (type === 'object') {
+	      return React.createElement(
+	        'span',
+	        null,
+	        val[consts.name] + '{…}'
+	      );
+	    }
+	    if (type === 'array') {
+	      return React.createElement(
+	        'span',
+	        null,
+	        'Array[',
+	        val[consts.meta].length,
+	        ']'
+	      );
+	    }
+	    if (type === 'symbol') {
+	      // the name is "Symbol(something)"
+	      return React.createElement(
+	        'span',
+	        { style: valueStyles.symbol },
+	        val[consts.name]
+	      );
+	    }
+	  }
+	  if (nested) {
+	    return React.createElement(
+	      'span',
+	      null,
+	      '{…}'
+	    );
+	  }
+	  return previewObject(val);
+	}
 
+	function previewArray(val) {
+	  var items = {};
+	  val.slice(0, 3).forEach((item, i) => {
+	    items['n' + i] = React.createElement(PropVal, { val: item, nested: true });
+	    items['c' + i] = ',';
+	  });
+	  if (val.length > 3) {
+	    items.last = '…';
+	  } else {
+	    delete items['c' + (val.length - 1)];
+	  }
+	  return React.createElement(
+	    'span',
+	    { style: valueStyles.array },
+	    '[',
+	    createFragment(items),
+	    ']'
+	  );
+	}
 
+	function previewObject(val) {
+	  var names = (0, _keys2.default)(val);
+	  var items = {};
+	  names.slice(0, 3).forEach((name, i) => {
+	    items['k' + i] = React.createElement(
+	      'span',
+	      { style: valueStyles.attr },
+	      name
+	    );
+	    items['c' + i] = ': ';
+	    items['v' + i] = React.createElement(PropVal, { val: val[name], nested: true });
+	    items['m' + i] = ', ';
+	  });
+	  if (names.length > 3) {
+	    items.rest = '…';
+	  } else {
+	    delete items['m' + (names.length - 1)];
+	  }
+	  return React.createElement(
+	    'span',
+	    { style: valueStyles.object },
+	    '{',
+	    createFragment(items),
+	    '}'
+	  );
+	}
 
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-
-	var consts=__webpack_require__(20);
-	var createFragment=__webpack_require__(272);
-	var flash=__webpack_require__(101);
-	var valueStyles=__webpack_require__(59);
-
-	class PropVal extends React.Component{
-
-
-
-
-	componentDidUpdate(prevProps){
-	if(this.props.val===prevProps.val){
-	return;}
-
-	if(this.props.val&&prevProps.val&&typeof this.props.val==='object'&&typeof prevProps.val==='object'){
-	return;}
-
-	var node=ReactDOM.findDOMNode(this);
-	flash(node,'rgba(0,255,0,1)','transparent',1);}
-
-
-	render(){
-	return previewProp(this.props.val,!!this.props.nested);}}
-
-
-
-	function previewProp(val,nested){
-	if(typeof val==='number'){
-	return React.createElement('span',{style:valueStyles.number},val);}
-
-	if(typeof val==='string'){
-	if(val.length>50){
-	val=val.slice(0,50)+'…';}
-
-	return React.createElement('span',{style:valueStyles.string},'"',val,'"');}
-
-	if(typeof val==='boolean'){
-	return React.createElement('span',{style:valueStyles.bool},''+val);}
-
-	if(Array.isArray(val)){
-	if(nested){
-	return React.createElement('span',{style:valueStyles.array},'[(',val.length,')]');}
-
-	return previewArray(val);}
-
-	if(!val){
-	return React.createElement('span',{style:valueStyles.empty},''+val);}
-
-	if(typeof val!=='object'){
-	return React.createElement('span',null,'…');}
-
-	if(val[consts.type]){
-	var type=val[consts.type];
-	if(type==='function'){
-	return (
-	React.createElement('span',{style:valueStyles.func},
-	val[consts.name]||'fn','()'));}
-
-
-
-	if(type==='object'){
-	return React.createElement('span',null,val[consts.name]+'{…}');}
-
-	if(type==='array'){
-	return React.createElement('span',null,'Array[',val[consts.meta].length,']');}
-
-	if(type==='symbol'){
-
-	return React.createElement('span',{style:valueStyles.symbol},val[consts.name]);}}
-
-
-	if(nested){
-	return React.createElement('span',null,'{…}');}
-
-	return previewObject(val);}
-
-
-	function previewArray(val){
-	var items={};
-	val.slice(0,3).forEach((item,i) => {
-	items['n'+i]=React.createElement(PropVal,{val:item,nested:true});
-	items['c'+i]=',';});
-
-	if(val.length>3){
-	items.last='…';}else 
-	{
-	delete items['c'+(val.length-1)];}
-
-	return (
-	React.createElement('span',{style:valueStyles.array},'[',
-	createFragment(items),']'));}
-
-
-
-
-	function previewObject(val){
-	var names=(0,_keys2.default)(val);
-	var items={};
-	names.slice(0,3).forEach((name,i) => {
-	items['k'+i]=React.createElement('span',{style:valueStyles.attr},name);
-	items['c'+i]=': ';
-	items['v'+i]=React.createElement(PropVal,{val:val[name],nested:true});
-	items['m'+i]=', ';});
-
-	if(names.length>3){
-	items.rest='…';}else 
-	{
-	delete items['m'+(names.length-1)];}
-
-	return (
-	React.createElement('span',{style:valueStyles.object},
-	'{',createFragment(items),'}'));}
-
-
-
-
-	module.exports=PropVal;
+	module.exports = PropVal;
 
 /***/ },
 /* 173 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(36);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(36);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var React = __webpack_require__(3);
+	var PropVal = __webpack_require__(172);
 
+	class Props extends React.Component {
+	  shouldComponentUpdate(nextProps) {
+	    if (nextProps === this.props) {
+	      return false;
+	    }
+	    return true;
+	  }
 
+	  render() {
+	    var props = this.props.props;
+	    if (!props || typeof props !== 'object') {
+	      return React.createElement('span', null);
+	    }
 
+	    var names = (0, _keys2.default)(props).filter(name => {
+	      return name[0] !== '_' && name !== 'children';
+	    });
 
+	    var items = [];
+	    names.slice(0, 3).forEach(name => {
+	      items.push(React.createElement(
+	        'span',
+	        { key: name, style: styles.prop },
+	        React.createElement(
+	          'span',
+	          { style: styles.propName },
+	          name
+	        ),
+	        '=',
+	        React.createElement(PropVal, { val: props[name] })
+	      ));
+	    });
 
+	    if (names.length > 3) {
+	      items.push('…');
+	    }
+	    return React.createElement(
+	      'span',
+	      null,
+	      items
+	    );
+	  }
+	}
 
+	var styles = {
+	  prop: {
+	    paddingLeft: 5
+	  },
 
-	var React=__webpack_require__(3);
-	var PropVal=__webpack_require__(172);
+	  propName: {
+	    color: 'rgb(165, 103, 42)'
+	  }
+	};
 
-	class Props extends React.Component{
-
-	shouldComponentUpdate(nextProps){
-	if(nextProps===this.props){
-	return false;}
-
-	return true;}
-
-
-	render(){
-	var props=this.props.props;
-	if(!props||typeof props!=='object'){
-	return React.createElement('span',null);}
-
-
-	var names=(0,_keys2.default)(props).filter(name => {
-	return name[0]!=='_'&&name!=='children';});
-
-
-	var items=[];
-	names.slice(0,3).forEach(name => {
-	items.push(
-	React.createElement('span',{key:name,style:styles.prop},
-	React.createElement('span',{style:styles.propName},name),'=',
-
-	React.createElement(PropVal,{val:props[name]})));});
-
-
-
-
-	if(names.length>3){
-	items.push('…');}
-
-	return React.createElement('span',null,items);}}
-
-
-
-	var styles={
-	prop:{
-	paddingLeft:5},
-
-
-	propName:{
-	color:'rgb(165, 103, 42)'}};
-
-
-
-	module.exports=Props;
+	module.exports = Props;
 
 /***/ },
 /* 174 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var ReactDOM=__webpack_require__(29);
-	var SettingsPane=__webpack_require__(175);
-	var TreeView=__webpack_require__(178);
-	var {PropTypes}=React;
-
-	var decorate=__webpack_require__(7);
-
-
-
-
-
-
-
-
-
-
-
-	class SearchPane extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={focused:false};}
-
-
-	componentDidMount(){
-	this._key=this.onDocumentKeyDown.bind(this);
-	var doc=ReactDOM.findDOMNode(this).ownerDocument;
-
-	doc.addEventListener('keydown',this._key,true);}
-
-
-	componentWillUnmount(){
-	var doc=ReactDOM.findDOMNode(this).ownerDocument;
-	doc.removeEventListener('keydown',this._key,true);}
-
-
-	onDocumentKeyDown(e){
-	if(e.keyCode===191){
-	var doc=ReactDOM.findDOMNode(this).ownerDocument;
-	if(!this.input||doc.activeElement===this.input){
-	return;}
-
-	this.input.focus();
-	e.preventDefault();}
-
-	if(e.keyCode===27){
-	if(!this.props.searchText&&!this.state.focused){
-	return;}
-
-	e.stopPropagation();
-	e.preventDefault();
-	this.cancel();}}
-
-
-
-	cancel(){
-	this.props.onChangeSearch('');
-	if(this.input){
-	this.input.blur();}}
-
-
-
-	onKeyDown(key){
-	if(key==='Enter'&&this.input){
-	this.props.selectFirstSearchResult();}}
-
-
-
-	render(){
-	var inputStyle=styles.input;
-	if(this.props.searchText||this.state.focused){
-	inputStyle=(0,_extends3.default)({},inputStyle,styles.highlightedInput);}
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement(SettingsPane,null),
-	React.createElement(TreeView,{reload:this.props.reload}),
-	React.createElement('div',{style:styles.searchBox},
-	React.createElement('input',{
-	style:inputStyle,
-	ref:i => this.input=i,
-	value:this.props.searchText,
-	onFocus:() => this.setState({focused:true}),
-	onBlur:() => this.setState({focused:false}),
-	onKeyDown:e => this.onKeyDown(e.key),
-	placeholder:'Search by Component Name',
-	onChange:e => this.props.onChangeSearch(e.target.value)}),
-
-	!!this.props.searchText&&React.createElement('div',{onClick:this.cancel.bind(this),style:styles.cancelButton},'×'))));}}
-
-
-
-
-
-
-
-
-	SearchPane.propTypes={
-	reload:PropTypes.func,
-	searchText:PropTypes.string,
-	onChangeSearch:PropTypes.func,
-	selectFirstSearchResult:PropTypes.func};
-
-
-	var Wrapped=decorate({
-	listeners(props){
-	return ['searchText'];},
-
-	props(store){
-	return {
-	searchText:store.searchText,
-	onChangeSearch:text => store.changeSearch(text),
-	selectFirstSearchResult:store.selectFirstSearchResult.bind(store)};}},
-
-
-	SearchPane);
-
-	var styles={
-	container:{
-	flex:1,
-	display:'flex',
-	flexDirection:'column',
-	minWidth:0},
-
-
-	searchBox:{
-	display:'flex',
-	flexShrink:0,
-	position:'relative'},
-
-
-	cancelButton:{
-	fontSize:'13px',
-	padding:'0 4px',
-	borderRadius:'10px',
-	height:'17px',
-	position:'absolute',
-	cursor:'pointer',
-	right:'7px',
-	top:'8px',
-	color:'white',
-	backgroundColor:'rgb(255, 137, 137)'},
-
-
-	input:{
-	flex:1,
-	fontSize:'18px',
-	padding:'5px 10px',
-	border:'none',
-	transition:'border-top-color .2s ease, background-color .2s ease',
-	borderTop:'1px solid #ccc',
-	borderTopColor:'#ccc',
-	outline:'none'},
-
-
-	highlightedInput:{
-	borderTopColor:'aqua',
-	backgroundColor:'#EEFFFE'}};
-
-
-
-	module.exports=Wrapped;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 * $FLowFixMe
+	 * - thinks all react component classes must inherit from React.Component
+	 */
+	'use strict';
+
+	var _extends2 = __webpack_require__(21);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var React = __webpack_require__(3);
+	var ReactDOM = __webpack_require__(29);
+	var SettingsPane = __webpack_require__(175);
+	var TreeView = __webpack_require__(178);
+	var { PropTypes } = React;
+
+	var decorate = __webpack_require__(7);
+
+	class SearchPane extends React.Component {
+
+	  constructor(props) {
+	    super(props);
+	    this.state = { focused: false };
+	  }
+
+	  componentDidMount() {
+	    this._key = this.onDocumentKeyDown.bind(this);
+	    var doc = ReactDOM.findDOMNode(this).ownerDocument;
+	    // capture=true is needed to prevent chrome devtools console popping up
+	    doc.addEventListener('keydown', this._key, true);
+	  }
+
+	  componentWillUnmount() {
+	    var doc = ReactDOM.findDOMNode(this).ownerDocument;
+	    doc.removeEventListener('keydown', this._key, true);
+	  }
+
+	  onDocumentKeyDown(e) {
+	    if (e.keyCode === 191) {
+	      // forward slash
+	      var doc = ReactDOM.findDOMNode(this).ownerDocument;
+	      if (!this.input || doc.activeElement === this.input) {
+	        return;
+	      }
+	      this.input.focus();
+	      e.preventDefault();
+	    }
+	    if (e.keyCode === 27) {
+	      // escape
+	      if (!this.props.searchText && !this.state.focused) {
+	        return;
+	      }
+	      e.stopPropagation();
+	      e.preventDefault();
+	      this.cancel();
+	    }
+	  }
+
+	  cancel() {
+	    this.props.onChangeSearch('');
+	    if (this.input) {
+	      this.input.blur();
+	    }
+	  }
+
+	  onKeyDown(key) {
+	    if (key === 'Enter' && this.input) {
+	      this.props.selectFirstSearchResult();
+	    }
+	  }
+
+	  render() {
+	    var inputStyle = styles.input;
+	    if (this.props.searchText || this.state.focused) {
+	      inputStyle = (0, _extends3.default)({}, inputStyle, styles.highlightedInput);
+	    }
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(SettingsPane, null),
+	      React.createElement(TreeView, { reload: this.props.reload }),
+	      React.createElement(
+	        'div',
+	        { style: styles.searchBox },
+	        React.createElement('input', {
+	          style: inputStyle,
+	          ref: i => this.input = i,
+	          value: this.props.searchText,
+	          onFocus: () => this.setState({ focused: true }),
+	          onBlur: () => this.setState({ focused: false }),
+	          onKeyDown: e => this.onKeyDown(e.key),
+	          placeholder: 'Search by Component Name',
+	          onChange: e => this.props.onChangeSearch(e.target.value)
+	        }),
+	        !!this.props.searchText && React.createElement(
+	          'div',
+	          { onClick: this.cancel.bind(this), style: styles.cancelButton },
+	          '×'
+	        )
+	      )
+	    );
+	  }
+	}
+
+	SearchPane.propTypes = {
+	  reload: PropTypes.func,
+	  searchText: PropTypes.string,
+	  onChangeSearch: PropTypes.func,
+	  selectFirstSearchResult: PropTypes.func
+	};
+
+	var Wrapped = decorate({
+	  listeners(props) {
+	    return ['searchText'];
+	  },
+	  props(store) {
+	    return {
+	      searchText: store.searchText,
+	      onChangeSearch: text => store.changeSearch(text),
+	      selectFirstSearchResult: store.selectFirstSearchResult.bind(store)
+	    };
+	  }
+	}, SearchPane);
+
+	var styles = {
+	  container: {
+	    flex: 1,
+	    display: 'flex',
+	    flexDirection: 'column',
+	    minWidth: 0
+	  },
+
+	  searchBox: {
+	    display: 'flex',
+	    flexShrink: 0,
+	    position: 'relative'
+	  },
+
+	  cancelButton: {
+	    fontSize: '13px',
+	    padding: '0 4px',
+	    borderRadius: '10px',
+	    height: '17px',
+	    position: 'absolute',
+	    cursor: 'pointer',
+	    right: '7px',
+	    top: '8px',
+	    color: 'white',
+	    backgroundColor: 'rgb(255, 137, 137)'
+	  },
+
+	  input: {
+	    flex: 1,
+	    fontSize: '18px',
+	    padding: '5px 10px',
+	    border: 'none',
+	    transition: 'border-top-color .2s ease, background-color .2s ease',
+	    borderTop: '1px solid #ccc',
+	    borderTopColor: '#ccc',
+	    outline: 'none'
+	  },
+
+	  highlightedInput: {
+	    borderTopColor: 'aqua',
+	    backgroundColor: '#EEFFFE'
+	  }
+	};
+
+	module.exports = Wrapped;
 
 /***/ },
 /* 175 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 */
 	'use strict';
 
+	var BananaSlugFrontendControl = __webpack_require__(184);
+	var React = __webpack_require__(3);
 
+	var decorate = __webpack_require__(7);
 
+	class SettingsPane extends React.Component {
+	  render() {
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(BananaSlugFrontendControl, this.props)
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    backgroundColor: '#efefef',
+	    padding: '2px 4px',
+	    display: 'flex',
+	    flexShrink: 0,
+	    position: 'relative'
+	  }
+	};
 
+	var Wrapped = decorate({
+	  listeners() {
+	    return ['bananaslugchange'];
+	  },
+	  props(store) {
+	    return {
+	      state: store.bananaslugState,
+	      onChange: state => store.changeBananaSlug(state)
+	    };
+	  }
+	}, SettingsPane);
 
-
-
-
-
-	var BananaSlugFrontendControl=__webpack_require__(184);
-	var React=__webpack_require__(3);
-
-	var decorate=__webpack_require__(7);
-
-	class SettingsPane extends React.Component{
-	render(){
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement(BananaSlugFrontendControl,this.props)));}}
-
-
-
-
-
-	var styles={
-	container:{
-	backgroundColor:'#efefef',
-	padding:'2px 4px',
-	display:'flex',
-	flexShrink:0,
-	position:'relative'}};
-
-
-
-	var Wrapped=decorate({
-	listeners(){
-	return ['bananaslugchange'];},
-
-	props(store){
-	return {
-	state:store.bananaslugState,
-	onChange:state => store.changeBananaSlug(state)};}},
-
-
-	SettingsPane);
-
-	module.exports=Wrapped;
+	module.exports = Wrapped;
 
 /***/ },
 /* 176 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-	var {EventEmitter}=__webpack_require__(121);
-	var {Map,Set,List}=__webpack_require__(76);
-	var assign=__webpack_require__(2);
-	var nodeMatchesText=__webpack_require__(181);
-	var consts=__webpack_require__(20);
-	var invariant=__webpack_require__(41);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class Store extends EventEmitter{
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	constructor(bridge){
-	super();
-	this._nodes=new Map();
-	this._parents=new Map();
-	this._nodesByName=new Map();
-	this._bridge=bridge;
-
-
-	this.roots=new List();
-	this.contextMenu=null;
-	this.searchRoots=null;
-	this.hovered=null;
-	this.selected=null;
-	this.selectedTab='Elements';
-	this.breadcrumbHead=null;
-	this.isBottomTagSelected=false;
-	this.searchText='';
-	this.capabilities={};
-	this.bananaslugState=null;
-
-
-	window.store=this;
-
-
-	this._bridge.on('root',id => {
-	if(this.roots.contains(id)){
-	return;}
-
-	this.roots=this.roots.push(id);
-	if(!this.selected){
-	this.selected=this.skipWrapper(id);
-	this.breadcrumbHead=this.selected;
-	this.emit('selected');
-	this.emit('breadcrumbHead');
-	this._bridge.send('selected',this.selected);}
-
-	this.emit('roots');});
-
-	this._bridge.on('mount',data => this._mountComponent(data));
-	this._bridge.on('update',data => this._updateComponent(data));
-	this._bridge.on('unmount',id => this._unmountComponenent(id));
-	this._bridge.on('select',({id,quiet}) => {
-	this._revealDeep(id);
-	this.selectTop(this.skipWrapper(id),quiet);
-	this.setSelectedTab('Elements');});
-
-
-	this._establishConnection();
-	this._eventQueue=[];
-	this._eventTimer=null;}
-
-
-	emit(event){
-	if(!this._eventTimer){
-	this._eventTimer=setTimeout(() => {
-	this._eventQueue.forEach(evt => {
-	EventEmitter.prototype.emit.call(this,evt);});
-
-	this._eventQueue=[];
-	this._eventTimer=null;},
-	50);
-	this._eventQueue=[];}
-
-	if(this._eventQueue.indexOf(event)===-1){
-	this._eventQueue.push(event);}
-
-
-	return true;}
-
-
-
-	scrollToNode(id){
-	this._bridge.send('scrollToNode',id);}
-
-
-	setSelectedTab(name){
-	if(this.selectedTab===name){
-	return;}
-
-	this.selectedTab=name;
-	this.emit('selectedTab');}
-
-
-
-	changeTextContent(id,text){
-	this._bridge.send('changeTextContent',{id,text});
-	var node=this._nodes.get(id);
-	if(node.get('nodeType')==='Text'){
-	this._nodes=this._nodes.set(id,node.set('text',text));}else 
-	{
-	this._nodes=this._nodes.set(id,node.set('children',text));
-	var props=node.get('props');
-	props.children=text;}
-
-	this.emit(id);}
-
-
-	changeSearch(text){
-	var needle=text.toLowerCase();
-	if(needle===this.searchText.toLowerCase()){
-	return;}
-
-	if(!text){
-	this.searchRoots=null;}else 
-	{
-	if(this.searchRoots&&needle.indexOf(this.searchText.toLowerCase())===0){
-	this.searchRoots=this.searchRoots.
-	filter(item => {
-	var node=this.get(item);
-	return node.get('name')&&node.get('name').toLowerCase().indexOf(needle)!==-1||
-	node.get('text')&&node.get('text').toLowerCase().indexOf(needle)!==-1||
-	typeof node.get('children')==='string'&&node.get('children').toLowerCase().indexOf(needle)!==-1;});}else 
-
-	{
-	this.searchRoots=this._nodes.entrySeq().
-	filter(([key,val]) => nodeMatchesText(val,needle,key,this)).
-	map(([key,val]) => key).
-	toList();}
-
-	this.searchRoots.forEach(id => {
-	if(this.hasBottom(id)){
-	this._nodes=this._nodes.setIn([id,'collapsed'],true);}});}
-
-
-
-	this.searchText=text;
-	this.emit('searchText');
-	this.emit('searchRoots');
-	if(this.searchRoots&&!this.searchRoots.contains(this.selected)){
-	this.select(null,true);}else 
-	if(!this.searchRoots){
-	if(this.selected){
-	this._revealDeep(this.selected);}else 
-	{
-	this.select(this.roots.get(0));}}}
-
-
-
-
-	hoverClass(name){
-	if(name===null){
-	this._bridge.send('hideHighlight');
-	return;}
-
-	var ids=this._nodesByName.get(name);
-	if(!ids){
-	return;}
-
-	this._bridge.send('highlightMany',ids.toArray());}
-
-
-	selectFirstOfClass(name){
-	var ids=this._nodesByName.get(name);
-	if(!ids||!ids.size){
-	return;}
-
-	var id=ids.toSeq().first();
-	this._revealDeep(id);
-	this.selectTop(id);}
-
-
-	showContextMenu(type,evt,...args){
-	evt.preventDefault();
-	this.contextMenu={type,x:evt.pageX,y:evt.pageY,args};
-	this.emit('contextMenu');}
-
-
-	hideContextMenu(){
-	this.contextMenu=null;
-	this.emit('contextMenu');}
-
-
-	selectFirstSearchResult(){
-	if(this.searchRoots){
-	this.select(this.searchRoots.get(0),true);}}
-
-
-
-	hasBottom(id){
-	var node=this.get(id);
-	var children=node.get('children');
-	if(node.get('nodeType')==='NativeWrapper'){
-	children=this.get(children[0]).get('children');}
-
-	if(typeof children==='string'||!children||!children.length||node.get('collapsed')){
-	return false;}
-
-	return true;}
-
-
-	toggleCollapse(id){
-	this._nodes=this._nodes.updateIn([id,'collapsed'],c => !c);
-	this.emit(id);}
-
-
-	setProps(id,path,value){
-	this._bridge.send('setProps',{id,path,value});}
-
-
-	setState(id,path,value){
-	this._bridge.send('setState',{id,path,value});}
-
-
-	setContext(id,path,value){
-	this._bridge.send('setContext',{id,path,value});}
-
-
-	makeGlobal(id,path){
-	this._bridge.send('makeGlobal',{id,path});}
-
-
-	setHover(id,isHovered){
-	if(isHovered){
-	var old=this.hovered;
-	this.hovered=id;
-	if(old){
-	this.emit(old);}
-
-	this.emit(id);
-	this.emit('hover');
-	this._bridge.send('highlight',id);}else 
-	if(this.hovered===id){
-	this.hideHighlight();}}
-
-
-
-	hideHighlight(){
-	this._bridge.send('hideHighlight');
-	if(!this.hovered){
-	return;}
-
-	var id=this.hovered;
-	this.hovered=null;
-	this.emit(id);
-	this.emit('hover');}
-
-
-	selectBreadcrumb(id){
-	this._revealDeep(id);
-	this.changeSearch('');
-	this.isBottomTagSelected=false;
-	this.select(id,false,true);}
-
-
-	selectTop(id,noHighlight){
-	this.isBottomTagSelected=false;
-	this.select(id,noHighlight);}
-
-
-	selectBottom(id){
-	this.isBottomTagSelected=true;
-	this.select(id);}
-
-
-	select(id,noHighlight,keepBreadcrumb){
-	var oldSel=this.selected;
-	this.selected=id;
-	if(oldSel){
-	this.emit(oldSel);}
-
-	if(id){
-	this.emit(id);}
-
-	if(!keepBreadcrumb){
-	this.breadcrumbHead=id;
-	this.emit('breadcrumbHead');}
-
-	this.emit('selected');
-	this._bridge.send('selected',id);
-	if(!noHighlight){
-	this._bridge.send('highlight',id);}}
-
-
-
-
-	get(id){
-	return this._nodes.get(id);}
-
-
-	getParent(id){
-	return this._parents.get(id);}
-
-
-	skipWrapper(id,up){
-	if(!id){
-	return undefined;}
-
-	var node=this.get(id);
-	var nodeType=node.get('nodeType');
-	if(nodeType!=='Wrapper'&&nodeType!=='Native'){
-	return id;}
-
-	if(nodeType==='Native'&&(!up||this.get(this._parents.get(id)).get('nodeType')!=='NativeWrapper')){
-	return id;}
-
-	if(up){
-	return this._parents.get(id);}
-
-	return node.get('children')[0];}
-
-
-	off(evt,fn){
-	this.removeListener(evt,fn);}
-
-
-	inspect(id,path,cb){
-	invariant(path[0]==='props'||path[0]==='state'||path[0]==='context',
-	'Inspected path must be one of props, state, or context');
-	this._bridge.inspect(id,path,value => {
-	var base=this.get(id).get(path[0]);
-	var inspected=path.slice(1).reduce((obj,attr) => obj?obj[attr]:null,base);
-	if(inspected){
-	assign(inspected,value);
-	inspected[consts.inspected]=true;}
-
-	cb();});}
-
-
-
-	changeBananaSlug(state){
-	this.bananaslugState=state;
-	this.emit('bananaslugchange');
-	this._bridge.send('bananaslugchange',state.toJS());}
-
-
-
-	_establishConnection(){
-	var tries=0;
-	var requestInt;
-	this._bridge.once('capabilities',capabilities => {
-	clearInterval(requestInt);
-	this.capabilities=assign(this.capabilities,capabilities);
-	this.emit('connected');});
-
-	this._bridge.send('requestCapabilities');
-	requestInt=setInterval(() => {
-	tries+=1;
-	if(tries>100){
-
-	clearInterval(requestInt);
-	this.emit('connection failed');
-	return;}
-
-	this._bridge.send('requestCapabilities');},
-	500);}
-
-
-	_revealDeep(id){
-	if(this.searchRoots&&this.searchRoots.contains(id)){
-	return;}
-
-	var pid=this._parents.get(id);
-	while(pid){
-	if(this._nodes.getIn([pid,'collapsed'])){
-	this._nodes=this._nodes.setIn([pid,'collapsed'],false);
-	this.emit(pid);}
-
-	if(this.searchRoots&&this.searchRoots.contains(pid)){
-	return;}
-
-	pid=this._parents.get(pid);}}
-
-
-
-	_mountComponent(data){
-	var map=Map(data).set('renders',1);
-	if(data.nodeType==='Composite'){
-	map=map.set('collapsed',true);}
-
-	this._nodes=this._nodes.set(data.id,map);
-	if(data.children&&data.children.forEach){
-	data.children.forEach(cid => {
-	this._parents=this._parents.set(cid,data.id);});}
-
-
-	var curNodes=this._nodesByName.get(data.name)||new Set();
-	this._nodesByName=this._nodesByName.set(data.name,curNodes.add(data.id));
-	this.emit(data.id);
-	if(this.searchRoots&&nodeMatchesText(map,this.searchText.toLowerCase(),data.id,this)){
-	this.searchRoots=this.searchRoots.push(data.id);
-	this.emit('searchRoots');}}
-
-
-
-	_updateComponent(data){
-	var node=this.get(data.id);
-	if(!node){
-	return;}
-
-	data.renders=node.get('renders')+1;
-	this._nodes=this._nodes.mergeIn([data.id],Map(data));
-	if(data.children&&data.children.forEach){
-	data.children.forEach(cid => {
-	this._parents=this._parents.set(cid,data.id);});}
-
-
-	this.emit(data.id);}
-
-
-	_unmountComponenent(id){
-	var pid=this._parents.get(id);
-	this._removeFromNodesByName(id);
-	this._parents=this._parents.delete(id);
-	this._nodes=this._nodes.delete(id);
-	if(pid){
-	this.emit(pid);}else 
-	{
-	var ix=this.roots.indexOf(id);
-	if(ix!==-1){
-	this.roots=this.roots.delete(ix);
-	this.emit('roots');}}
-
-
-	if(id===this.selected){
-	var newsel=pid?this.skipWrapper(pid,true):this.roots.get(0);
-	this.selectTop(newsel,true);}
-
-	if(this.searchRoots&&this.searchRoots.contains(id)){
-
-	this.searchRoots=this.searchRoots.delete(this.searchRoots.indexOf(id));
-	this.emit('searchRoots');}}
-
-
-
-	_removeFromNodesByName(id){
-	var node=this._nodes.get(id);
-	if(node){
-	this._nodesByName=this._nodesByName.set(node.get('name'),this._nodesByName.get(node.get('name')).delete(id));}}}
-
-
-
-
-	module.exports=Store;
+	var { EventEmitter } = __webpack_require__(121);
+	var { Map, Set, List } = __webpack_require__(76);
+	var assign = __webpack_require__(2);
+	var nodeMatchesText = __webpack_require__(181);
+	var consts = __webpack_require__(20);
+	var invariant = __webpack_require__(41);
+
+	/**
+	 * This is the main frontend [fluxy?] Store, responsible for taking care of
+	 * state. It emits events when things change that you can subscribe to. The
+	 * best way to interact with the Store (if you are a React Component) is to
+	 * use the decorator in `decorate.js`. The top-level component (defined
+	 * by a shell) is generally responsible for creating the Store connecting it
+	 * up to a bridge, and putting it on `context` so the decorator can access it.
+	 *
+	 * Public events:
+	 *
+	 * - connected / connection failed
+	 * - roots
+	 * - searchText
+	 * - searchRoots
+	 * - contextMenu
+	 * - hover
+	 * - selected
+	 * - [node id]
+	 *
+	 * Public state:
+	 *  see attrs / constructor
+	 *
+	 * Public actions:
+	 * - scrollToNode(id)
+	 * - changeTextContent(id, text)
+	 * - changeSearch
+	 * - hoverClass
+	 * - selectFirstOfClass
+	 * - showContextMenu
+	 * - hideContextMenu
+	 * - selectFirstSearchResult
+	 * - toggleCollapse
+	 * - setProps/State/Context
+	 * - makeGlobal(id, path)
+	 * - setHover(id, isHovered)
+	 * - selectTop(id)
+	 * - selectBottom(id)
+	 * - select(id)
+	 *
+	 * Public methods:
+	 * - get(id) => Map (the node)
+	 * - getParent(id) => pid
+	 * - skipWrapper(id, up?) => id
+	 * - hasBottom(id) => bool
+	 * - on / off
+	 * - inspect(id, path, cb)
+	 */
+	class Store extends EventEmitter {
+
+	  constructor(bridge) {
+	    super();
+	    this._nodes = new Map();
+	    this._parents = new Map();
+	    this._nodesByName = new Map();
+	    this._bridge = bridge;
+
+	    // Public state
+	    this.roots = new List();
+	    this.contextMenu = null;
+	    this.searchRoots = null;
+	    this.hovered = null;
+	    this.selected = null;
+	    this.selectedTab = 'Elements';
+	    this.breadcrumbHead = null;
+	    this.isBottomTagSelected = false;
+	    this.searchText = '';
+	    this.capabilities = {};
+	    this.bananaslugState = null;
+
+	    // for debugging
+	    window.store = this;
+
+	    // events from the backend
+	    this._bridge.on('root', id => {
+	      if (this.roots.contains(id)) {
+	        return;
+	      }
+	      this.roots = this.roots.push(id);
+	      if (!this.selected) {
+	        this.selected = this.skipWrapper(id);
+	        this.breadcrumbHead = this.selected;
+	        this.emit('selected');
+	        this.emit('breadcrumbHead');
+	        this._bridge.send('selected', this.selected);
+	      }
+	      this.emit('roots');
+	    });
+	    this._bridge.on('mount', data => this._mountComponent(data));
+	    this._bridge.on('update', data => this._updateComponent(data));
+	    this._bridge.on('unmount', id => this._unmountComponenent(id));
+	    this._bridge.on('select', ({ id, quiet }) => {
+	      this._revealDeep(id);
+	      this.selectTop(this.skipWrapper(id), quiet);
+	      this.setSelectedTab('Elements');
+	    });
+
+	    this._establishConnection();
+	    this._eventQueue = [];
+	    this._eventTimer = null;
+	  }
+	  // an object describing the capabilities of the inspected runtime.
+
+
+	  // Public state
+
+
+	  emit(event) {
+	    if (!this._eventTimer) {
+	      this._eventTimer = setTimeout(() => {
+	        this._eventQueue.forEach(evt => {
+	          EventEmitter.prototype.emit.call(this, evt);
+	        });
+	        this._eventQueue = [];
+	        this._eventTimer = null;
+	      }, 50);
+	      this._eventQueue = [];
+	    }
+	    if (this._eventQueue.indexOf(event) === -1) {
+	      this._eventQueue.push(event);
+	    }
+	    // to appease flow
+	    return true;
+	  }
+
+	  // Public actions
+	  scrollToNode(id) {
+	    this._bridge.send('scrollToNode', id);
+	  }
+
+	  setSelectedTab(name) {
+	    if (this.selectedTab === name) {
+	      return;
+	    }
+	    this.selectedTab = name;
+	    this.emit('selectedTab');
+	  }
+
+	  // TODO(jared): get this working for react native
+	  changeTextContent(id, text) {
+	    this._bridge.send('changeTextContent', { id, text });
+	    var node = this._nodes.get(id);
+	    if (node.get('nodeType') === 'Text') {
+	      this._nodes = this._nodes.set(id, node.set('text', text));
+	    } else {
+	      this._nodes = this._nodes.set(id, node.set('children', text));
+	      var props = node.get('props');
+	      props.children = text;
+	    }
+	    this.emit(id);
+	  }
+
+	  changeSearch(text) {
+	    var needle = text.toLowerCase();
+	    if (needle === this.searchText.toLowerCase()) {
+	      return;
+	    }
+	    if (!text) {
+	      this.searchRoots = null;
+	    } else {
+	      if (this.searchRoots && needle.indexOf(this.searchText.toLowerCase()) === 0) {
+	        this.searchRoots = this.searchRoots.filter(item => {
+	          var node = this.get(item);
+	          return node.get('name') && node.get('name').toLowerCase().indexOf(needle) !== -1 || node.get('text') && node.get('text').toLowerCase().indexOf(needle) !== -1 || typeof node.get('children') === 'string' && node.get('children').toLowerCase().indexOf(needle) !== -1;
+	        });
+	      } else {
+	        this.searchRoots = this._nodes.entrySeq().filter(([key, val]) => nodeMatchesText(val, needle, key, this)).map(([key, val]) => key).toList();
+	      }
+	      this.searchRoots.forEach(id => {
+	        if (this.hasBottom(id)) {
+	          this._nodes = this._nodes.setIn([id, 'collapsed'], true);
+	        }
+	      });
+	    }
+	    this.searchText = text;
+	    this.emit('searchText');
+	    this.emit('searchRoots');
+	    if (this.searchRoots && !this.searchRoots.contains(this.selected)) {
+	      this.select(null, true);
+	    } else if (!this.searchRoots) {
+	      if (this.selected) {
+	        this._revealDeep(this.selected);
+	      } else {
+	        this.select(this.roots.get(0));
+	      }
+	    }
+	  }
+
+	  hoverClass(name) {
+	    if (name === null) {
+	      this._bridge.send('hideHighlight');
+	      return;
+	    }
+	    var ids = this._nodesByName.get(name);
+	    if (!ids) {
+	      return;
+	    }
+	    this._bridge.send('highlightMany', ids.toArray());
+	  }
+
+	  selectFirstOfClass(name) {
+	    var ids = this._nodesByName.get(name);
+	    if (!ids || !ids.size) {
+	      return;
+	    }
+	    var id = ids.toSeq().first();
+	    this._revealDeep(id);
+	    this.selectTop(id);
+	  }
+
+	  showContextMenu(type, evt, ...args) {
+	    evt.preventDefault();
+	    this.contextMenu = { type, x: evt.pageX, y: evt.pageY, args };
+	    this.emit('contextMenu');
+	  }
+
+	  hideContextMenu() {
+	    this.contextMenu = null;
+	    this.emit('contextMenu');
+	  }
+
+	  selectFirstSearchResult() {
+	    if (this.searchRoots) {
+	      this.select(this.searchRoots.get(0), true);
+	    }
+	  }
+
+	  hasBottom(id) {
+	    var node = this.get(id);
+	    var children = node.get('children');
+	    if (node.get('nodeType') === 'NativeWrapper') {
+	      children = this.get(children[0]).get('children');
+	    }
+	    if (typeof children === 'string' || !children || !children.length || node.get('collapsed')) {
+	      return false;
+	    }
+	    return true;
+	  }
+
+	  toggleCollapse(id) {
+	    this._nodes = this._nodes.updateIn([id, 'collapsed'], c => !c);
+	    this.emit(id);
+	  }
+
+	  setProps(id, path, value) {
+	    this._bridge.send('setProps', { id, path, value });
+	  }
+
+	  setState(id, path, value) {
+	    this._bridge.send('setState', { id, path, value });
+	  }
+
+	  setContext(id, path, value) {
+	    this._bridge.send('setContext', { id, path, value });
+	  }
+
+	  makeGlobal(id, path) {
+	    this._bridge.send('makeGlobal', { id, path });
+	  }
+
+	  setHover(id, isHovered) {
+	    if (isHovered) {
+	      var old = this.hovered;
+	      this.hovered = id;
+	      if (old) {
+	        this.emit(old);
+	      }
+	      this.emit(id);
+	      this.emit('hover');
+	      this._bridge.send('highlight', id);
+	    } else if (this.hovered === id) {
+	      this.hideHighlight();
+	    }
+	  }
+
+	  hideHighlight() {
+	    this._bridge.send('hideHighlight');
+	    if (!this.hovered) {
+	      return;
+	    }
+	    var id = this.hovered;
+	    this.hovered = null;
+	    this.emit(id);
+	    this.emit('hover');
+	  }
+
+	  selectBreadcrumb(id) {
+	    this._revealDeep(id);
+	    this.changeSearch('');
+	    this.isBottomTagSelected = false;
+	    this.select(id, false, true);
+	  }
+
+	  selectTop(id, noHighlight) {
+	    this.isBottomTagSelected = false;
+	    this.select(id, noHighlight);
+	  }
+
+	  selectBottom(id) {
+	    this.isBottomTagSelected = true;
+	    this.select(id);
+	  }
+
+	  select(id, noHighlight, keepBreadcrumb) {
+	    var oldSel = this.selected;
+	    this.selected = id;
+	    if (oldSel) {
+	      this.emit(oldSel);
+	    }
+	    if (id) {
+	      this.emit(id);
+	    }
+	    if (!keepBreadcrumb) {
+	      this.breadcrumbHead = id;
+	      this.emit('breadcrumbHead');
+	    }
+	    this.emit('selected');
+	    this._bridge.send('selected', id);
+	    if (!noHighlight) {
+	      this._bridge.send('highlight', id);
+	    }
+	  }
+
+	  // Public methods
+	  get(id) {
+	    return this._nodes.get(id);
+	  }
+
+	  getParent(id) {
+	    return this._parents.get(id);
+	  }
+
+	  skipWrapper(id, up) {
+	    if (!id) {
+	      return undefined;
+	    }
+	    var node = this.get(id);
+	    var nodeType = node.get('nodeType');
+	    if (nodeType !== 'Wrapper' && nodeType !== 'Native') {
+	      return id;
+	    }
+	    if (nodeType === 'Native' && (!up || this.get(this._parents.get(id)).get('nodeType') !== 'NativeWrapper')) {
+	      return id;
+	    }
+	    if (up) {
+	      return this._parents.get(id);
+	    }
+	    return node.get('children')[0];
+	  }
+
+	  off(evt, fn) {
+	    this.removeListener(evt, fn);
+	  }
+
+	  inspect(id, path, cb) {
+	    invariant(path[0] === 'props' || path[0] === 'state' || path[0] === 'context', 'Inspected path must be one of props, state, or context');
+	    this._bridge.inspect(id, path, value => {
+	      var base = this.get(id).get(path[0]);
+	      var inspected = path.slice(1).reduce((obj, attr) => obj ? obj[attr] : null, base);
+	      if (inspected) {
+	        assign(inspected, value);
+	        inspected[consts.inspected] = true;
+	      }
+	      cb();
+	    });
+	  }
+
+	  changeBananaSlug(state) {
+	    this.bananaslugState = state;
+	    this.emit('bananaslugchange');
+	    this._bridge.send('bananaslugchange', state.toJS());
+	  }
+
+	  // Private stuff
+	  _establishConnection() {
+	    var tries = 0;
+	    var requestInt;
+	    this._bridge.once('capabilities', capabilities => {
+	      clearInterval(requestInt);
+	      this.capabilities = assign(this.capabilities, capabilities);
+	      this.emit('connected');
+	    });
+	    this._bridge.send('requestCapabilities');
+	    requestInt = setInterval(() => {
+	      tries += 1;
+	      if (tries > 100) {
+	        clearInterval(requestInt);
+	        this.emit('connection failed');
+	        return;
+	      }
+	      this._bridge.send('requestCapabilities');
+	    }, 500);
+	  }
+
+	  _revealDeep(id) {
+	    if (this.searchRoots && this.searchRoots.contains(id)) {
+	      return;
+	    }
+	    var pid = this._parents.get(id);
+	    while (pid) {
+	      if (this._nodes.getIn([pid, 'collapsed'])) {
+	        this._nodes = this._nodes.setIn([pid, 'collapsed'], false);
+	        this.emit(pid);
+	      }
+	      if (this.searchRoots && this.searchRoots.contains(pid)) {
+	        return;
+	      }
+	      pid = this._parents.get(pid);
+	    }
+	  }
+
+	  _mountComponent(data) {
+	    var map = Map(data).set('renders', 1);
+	    if (data.nodeType === 'Composite') {
+	      map = map.set('collapsed', true);
+	    }
+	    this._nodes = this._nodes.set(data.id, map);
+	    if (data.children && data.children.forEach) {
+	      data.children.forEach(cid => {
+	        this._parents = this._parents.set(cid, data.id);
+	      });
+	    }
+	    var curNodes = this._nodesByName.get(data.name) || new Set();
+	    this._nodesByName = this._nodesByName.set(data.name, curNodes.add(data.id));
+	    this.emit(data.id);
+	    if (this.searchRoots && nodeMatchesText(map, this.searchText.toLowerCase(), data.id, this)) {
+	      this.searchRoots = this.searchRoots.push(data.id);
+	      this.emit('searchRoots');
+	    }
+	  }
+
+	  _updateComponent(data) {
+	    var node = this.get(data.id);
+	    if (!node) {
+	      return;
+	    }
+	    data.renders = node.get('renders') + 1;
+	    this._nodes = this._nodes.mergeIn([data.id], Map(data));
+	    if (data.children && data.children.forEach) {
+	      data.children.forEach(cid => {
+	        this._parents = this._parents.set(cid, data.id);
+	      });
+	    }
+	    this.emit(data.id);
+	  }
+
+	  _unmountComponenent(id) {
+	    var pid = this._parents.get(id);
+	    this._removeFromNodesByName(id);
+	    this._parents = this._parents.delete(id);
+	    this._nodes = this._nodes.delete(id);
+	    if (pid) {
+	      this.emit(pid);
+	    } else {
+	      var ix = this.roots.indexOf(id);
+	      if (ix !== -1) {
+	        this.roots = this.roots.delete(ix);
+	        this.emit('roots');
+	      }
+	    }
+	    if (id === this.selected) {
+	      var newsel = pid ? this.skipWrapper(pid, true) : this.roots.get(0);
+	      this.selectTop(newsel, true);
+	    }
+	    if (this.searchRoots && this.searchRoots.contains(id)) {
+	      // $FlowFixMe flow things searchRoots might be null
+	      this.searchRoots = this.searchRoots.delete(this.searchRoots.indexOf(id));
+	      this.emit('searchRoots');
+	    }
+	  }
+
+	  _removeFromNodesByName(id) {
+	    var node = this._nodes.get(id);
+	    if (node) {
+	      this._nodesByName = this._nodesByName.set(node.get('name'), this._nodesByName.get(node.get('name')).delete(id));
+	    }
+	  }
+	}
+
+	module.exports = Store;
 
 /***/ },
 /* 177 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(36);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(36);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var React = __webpack_require__(3);
+	var assign = __webpack_require__(2);
+	var decorate = __webpack_require__(7);
 
+	class TabbedPane extends React.Component {
 
+	  render() {
+	    var tabs = (0, _keys2.default)(this.props.tabs);
+	    if (tabs.length === 1) {
+	      return this.props.tabs[tabs[0]]();
+	    }
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(
+	        'ul',
+	        { style: styles.tabs },
+	        tabs.map((name, i) => {
+	          var style = styles.tab;
+	          if (name === this.props.selected) {
+	            style = assign({}, style, styles.selectedTab);
+	          }
+	          if (i === tabs.length - 1) {
+	            style = assign({}, style, styles.lastTab);
+	          }
+	          return React.createElement(
+	            'li',
+	            { key: name + i, style: style, onClick: () => this.props.setSelectedTab(name) },
+	            name
+	          );
+	        })
+	      ),
+	      React.createElement(
+	        'div',
+	        { style: styles.body },
+	        this.props.tabs[this.props.selected]()
+	      )
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    flex: 1,
+	    display: 'flex',
+	    flexDirection: 'column',
+	    width: '100%'
+	  },
+	  tabs: {
+	    display: 'flex',
+	    flexShrink: 0,
+	    listStyle: 'none',
+	    backgroundColor: '#eee',
+	    borderBottom: '1px solid rgb(163, 163, 163)',
+	    margin: 0,
+	    padding: '0 2px'
+	  },
+	  tab: {
+	    padding: '2px 4px',
+	    lineHeight: '15px',
+	    fontSize: 12,
+	    fontFamily: "'Lucida Grande', sans-serif",
+	    cursor: 'pointer',
+	    borderLeft: '1px solid rgb(163, 163, 163)'
+	  },
+	  lastTab: {
+	    borderRight: '1px solid rgb(163, 163, 163)'
+	  },
+	  selectedTab: {
+	    backgroundColor: 'white'
+	  },
+	  body: {
+	    flex: 1,
+	    display: 'flex',
+	    minHeight: 0
+	  }
+	};
 
-
-
-
-	var React=__webpack_require__(3);
-	var assign=__webpack_require__(2);
-	var decorate=__webpack_require__(7);
-
-	class TabbedPane extends React.Component{
-
-
-
-
-
-
-	render(){
-	var tabs=(0,_keys2.default)(this.props.tabs);
-	if(tabs.length===1){
-	return this.props.tabs[tabs[0]]();}
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('ul',{style:styles.tabs},
-	tabs.map((name,i) => {
-	var style=styles.tab;
-	if(name===this.props.selected){
-	style=assign({},style,styles.selectedTab);}
-
-	if(i===tabs.length-1){
-	style=assign({},style,styles.lastTab);}
-
-	return (
-	React.createElement('li',{key:name+i,style:style,onClick:() => this.props.setSelectedTab(name)},
-	name));})),
-
-
-
-
-	React.createElement('div',{style:styles.body},
-	this.props.tabs[this.props.selected]())));}}
-
-
-
-
-
-
-	var styles={
-	container:{
-	flex:1,
-	display:'flex',
-	flexDirection:'column',
-	width:'100%'},
-
-	tabs:{
-	display:'flex',
-	flexShrink:0,
-	listStyle:'none',
-	backgroundColor:'#eee',
-	borderBottom:'1px solid rgb(163, 163, 163)',
-	margin:0,
-	padding:'0 2px'},
-
-	tab:{
-	padding:'2px 4px',
-	lineHeight:'15px',
-	fontSize:12,
-	fontFamily:"'Lucida Grande', sans-serif",
-	cursor:'pointer',
-	borderLeft:'1px solid rgb(163, 163, 163)'},
-
-	lastTab:{
-	borderRight:'1px solid rgb(163, 163, 163)'},
-
-	selectedTab:{
-	backgroundColor:'white'},
-
-	body:{
-	flex:1,
-	display:'flex',
-	minHeight:0}};
-
-
-
-	module.exports=decorate({
-	listeners:() => ['selectedTab'],
-	shouldUpdate:(props,prevProps) => {
-	for(var name in props){
-	if(props[name]!==prevProps[name]){
-	return true;}}
-
-
-	return false;},
-
-	props(store){
-	return {
-	selected:store.selectedTab,
-	setSelectedTab:name => store.setSelectedTab(name)};}},
-
-
-	TabbedPane);
+	module.exports = decorate({
+	  listeners: () => ['selectedTab'],
+	  shouldUpdate: (props, prevProps) => {
+	    for (var name in props) {
+	      if (props[name] !== prevProps[name]) {
+	        return true;
+	      }
+	    }
+	    return false;
+	  },
+	  props(store) {
+	    return {
+	      selected: store.selectedTab,
+	      setSelectedTab: name => store.setSelectedTab(name)
+	    };
+	  }
+	}, TabbedPane);
 
 /***/ },
 /* 178 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var Breadcrumb = __webpack_require__(162);
+	var Node = __webpack_require__(169);
+	var React = __webpack_require__(3);
 
+	var decorate = __webpack_require__(7);
 
+	var MAX_SEARCH_ROOTS = 200;
 
+	class TreeView extends React.Component {
 
+	  getChildContext() {
+	    return {
+	      scrollTo: this.scrollTo.bind(this)
+	    };
+	  }
 
+	  scrollTo(val, height) {
+	    if (!this.node) {
+	      return;
+	    }
+	    var top = this.node.scrollTop;
+	    var rel = val - this.node.offsetTop;
+	    var margin = 40;
+	    if (top > rel - margin) {
+	      this.node.scrollTop = rel - margin;
+	    } else if (top + this.node.offsetHeight < rel + height + margin) {
+	      this.node.scrollTop = rel - this.node.offsetHeight + height + margin;
+	    }
+	  }
 
+	  render() {
+	    if (!this.props.roots.count()) {
+	      if (this.props.searching) {
+	        return React.createElement(
+	          'div',
+	          { style: styles.container },
+	          React.createElement(
+	            'span',
+	            null,
+	            'No search results'
+	          )
+	        );
+	      } else {
+	        return React.createElement(
+	          'div',
+	          { style: styles.container },
+	          React.createElement(
+	            'span',
+	            null,
+	            'Waiting for roots to load...',
+	            this.props.reload && React.createElement(
+	              'span',
+	              null,
+	              'to reload the inspector ',
+	              React.createElement(
+	                'button',
+	                { onClick: this.props.reload },
+	                ' click here'
+	              )
+	            )
+	          )
+	        );
+	      }
+	    }
 
+	    if (this.props.searching && this.props.roots.count() > MAX_SEARCH_ROOTS) {
+	      return React.createElement(
+	        'div',
+	        { style: styles.container },
+	        this.props.roots.slice(0, MAX_SEARCH_ROOTS).map(id => React.createElement(Node, { key: id, id: id, depth: 0 })).toJS(),
+	        React.createElement(
+	          'span',
+	          null,
+	          'Some results not shown. Narrow your search criteria to find them'
+	        )
+	      );
+	    }
 
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(
+	        'div',
+	        { ref: n => this.node = n, style: styles.scroll },
+	        this.props.roots.map(id => React.createElement(Node, { key: id, id: id, depth: 0 })).toJS()
+	      ),
+	      React.createElement(Breadcrumb, null)
+	    );
+	  }
+	}
 
+	TreeView.childContextTypes = {
+	  scrollTo: React.PropTypes.func
+	};
 
-	var Breadcrumb=__webpack_require__(162);
-	var Node=__webpack_require__(169);
-	var React=__webpack_require__(3);
+	var styles = {
+	  container: {
+	    fontFamily: 'Menlo, monospace',
+	    fontSize: '11px',
+	    flex: 1,
+	    display: 'flex',
+	    flexDirection: 'column',
+	    minHeight: 0,
 
+	    WebkitUserSelect: 'none',
+	    MozUserSelect: 'none',
+	    userSelect: 'none'
+	  },
+	  scroll: {
+	    padding: 3,
+	    overflow: 'auto',
+	    minHeight: 0,
+	    flex: 1
+	  }
+	};
 
+	var WrappedTreeView = decorate({
+	  listeners(props) {
+	    return ['searchRoots', 'roots'];
+	  },
+	  props(store, props) {
+	    return {
+	      roots: store.searchRoots || store.roots,
+	      searching: !!store.searchRoots
+	    };
+	  }
+	}, TreeView);
 
-	var decorate=__webpack_require__(7);
-
-	var MAX_SEARCH_ROOTS=200;
-
-	class TreeView extends React.Component{
-
-
-	getChildContext(){
-	return {
-	scrollTo:this.scrollTo.bind(this)};}
-
-
-
-	scrollTo(val,height){
-	if(!this.node){
-	return;}
-
-	var top=this.node.scrollTop;
-	var rel=val-this.node.offsetTop;
-	var margin=40;
-	if(top>rel-margin){
-	this.node.scrollTop=rel-margin;}else 
-	if(top+this.node.offsetHeight<rel+height+margin){
-	this.node.scrollTop=rel-this.node.offsetHeight+height+margin;}}
-
-
-
-	render(){
-	if(!this.props.roots.count()){
-	if(this.props.searching){
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('span',null,'No search results')));}else 
-
-
-	{
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('span',null,'Waiting for roots to load...',
-
-	this.props.reload&&
-	React.createElement('span',null,'to reload the inspector ',
-	React.createElement('button',{onClick:this.props.reload},' click here')))));}}
-
-
-
-
-
-
-
-	if(this.props.searching&&this.props.roots.count()>MAX_SEARCH_ROOTS){
-	return (
-	React.createElement('div',{style:styles.container},
-	this.props.roots.slice(0,MAX_SEARCH_ROOTS).map(id => 
-	React.createElement(Node,{key:id,id:id,depth:0})).
-	toJS(),
-	React.createElement('span',null,'Some results not shown. Narrow your search criteria to find them')));}
-
-
-
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('div',{ref:n => this.node=n,style:styles.scroll},
-	this.props.roots.map(id => 
-	React.createElement(Node,{key:id,id:id,depth:0})).
-	toJS()),
-
-	React.createElement(Breadcrumb,null)));}}
-
-
-
-
-
-	TreeView.childContextTypes={
-	scrollTo:React.PropTypes.func};
-
-
-	var styles={
-	container:{
-	fontFamily:'Menlo, monospace',
-	fontSize:'11px',
-	flex:1,
-	display:'flex',
-	flexDirection:'column',
-	minHeight:0,
-
-	WebkitUserSelect:'none',
-	MozUserSelect:'none',
-	userSelect:'none'},
-
-	scroll:{
-	padding:3,
-	overflow:'auto',
-	minHeight:0,
-	flex:1}};
-
-
-
-	var WrappedTreeView=decorate({
-	listeners(props){
-	return ['searchRoots','roots'];},
-
-	props(store,props){
-	return {
-	roots:store.searchRoots||store.roots,
-	searching:!!store.searchRoots};}},
-
-
-	TreeView);
-
-	module.exports=WrappedTreeView;
+	module.exports = WrappedTreeView;
 
 /***/ },
 /* 179 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * A helper method for the store, to deal with navigating the tree.
+	 *
+	 *
+	 */
 	'use strict';
 
+	module.exports = function (dir, bottom, collapsed, hasChildren) {
+	  if (dir === 'down') {
+	    if (bottom || collapsed || !hasChildren) {
+	      return 'nextSibling';
+	    }
+	    return 'firstChild';
+	  }
 
+	  if (dir === 'up') {
+	    if (!bottom || collapsed || !hasChildren) {
+	      return 'prevSibling';
+	    }
+	    return 'lastChild';
+	  }
 
+	  if (dir === 'left') {
+	    if (!collapsed && hasChildren) {
+	      return 'collapse';
+	    }
+	    return 'parent';
+	  }
 
-
-
-
-
-
-
-
-
-
-
-
-	module.exports=function(dir,bottom,collapsed,hasChildren){
-	if(dir==='down'){
-	if(bottom||collapsed||!hasChildren){
-	return 'nextSibling';}
-
-	return 'firstChild';}
-
-
-	if(dir==='up'){
-	if(!bottom||collapsed||!hasChildren){
-	return 'prevSibling';}
-
-	return 'lastChild';}
-
-
-	if(dir==='left'){
-	if(!collapsed&&hasChildren){
-	return 'collapse';}
-
-	return 'parent';}
-
-
-	if(dir==='right'){
-	if(collapsed&&hasChildren){
-	return 'uncollapse';}
-
-	if(hasChildren){
-	if(bottom){
-	return 'lastChild';}else 
-	{
-	return 'firstChild';}}
-
-
-	return null;}};
+	  if (dir === 'right') {
+	    if (collapsed && hasChildren) {
+	      return 'uncollapse';
+	    }
+	    if (hasChildren) {
+	      if (bottom) {
+	        return 'lastChild';
+	      } else {
+	        return 'firstChild';
+	      }
+	    }
+	    return null;
+	  }
+	};
 
 /***/ },
 /* 180 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 * A helper method for the store, to deal with navigating the tree.
+	 *
+	 *
+	 */
 	'use strict';
 
-
-
-
-
-
-
-
-
-
-
-
-
-	var dirToDest=__webpack_require__(179);
-
-
-
-	var keyCodes={
-	'72':'left',
-	'74':'down',
-	'75':'up',
-	'76':'right',
-
-	'37':'left',
-	'38':'up',
-	'39':'right',
-	'40':'down'};
-
-
-	module.exports=function keyboardNav(store,win){
-	win=win||window;
-	return function(e){
-	if(win.document.activeElement!==win.document.body){
-	return;}
-
-	if(e.shiftKey||e.ctrlKey||e.metaKey||e.altKey){
-	return;}
-
-
-	var direction=keyCodes[e.keyCode];
-	if(!direction){
-	return;}
-
-	e.preventDefault();
-	var dest=getDest(direction,store);
-	if(!dest){
-	return;}
-
-	var move=getNewSelection(dest,store);
-	if(move&&move!==store.selected){
-	store.select(move);}};};
-
-
-
-
-	function getDest(dir,store){
-	var id=store.selected;
-	if(!id){
-	return null;}
-
-	var bottom=store.isBottomTagSelected;
-	var node=store.get(id);
-	var collapsed=node.get('collapsed');
-	var children=node.get('children');
-	if(node.get('nodeType')==='NativeWrapper'){
-	children=store.get(children[0]).get('children');}
-
-	var hasChildren=children&&typeof children!=='string'&&children.length;
-
-	return dirToDest(dir,bottom,collapsed,hasChildren);}
-
-
-	function getNewSelection(dest,store){
-	var id=store.selected;
-	if(!id){
-	return undefined;}
-
-	var node=store.get(id);
-	var pid=store.skipWrapper(store.getParent(id),true);
-
-	if(store.searchRoots&&store.searchRoots.contains(id)){
-	pid=null;}
-
-
-	if(dest==='parent'){
-	return pid;}
-
-	if(dest==='parentBottom'){
-	store.isBottomTagSelected=true;
-	return pid;}
-
-
-	if(dest==='collapse'||dest==='uncollapse'){
-	if(dest==='collapse'){
-	store.isBottomTagSelected=false;}
-
-	store.toggleCollapse(id);
-	return undefined;}
-
-
-	var children=node.get('children');
-	if(node.get('nodeType')==='NativeWrapper'){
-	children=store.get(children[0]).get('children');}
-
-
-
-	if(dest==='firstChild'){
-	if(typeof children==='string'){
-	return getNewSelection('nextSibling',store);}
-
-	store.isBottomTagSelected=false;
-	return store.skipWrapper(children[0]);}
-
-	if(dest==='lastChild'){
-	if(typeof children==='string'){
-	return getNewSelection('prevSibling',store);}
-
-	var cid=store.skipWrapper(children[children.length-1]);
-	if(cid&&!store.hasBottom(cid)){
-	store.isBottomTagSelected=false;}
-
-	return cid;}
-
-
-
-	if(!pid){
-	var roots=store.searchRoots||store.roots;
-	var ix=roots.indexOf(id);
-	if(ix===-1){
-	ix=roots.indexOf(store._parents.get(id));}
-
-	if(dest==='prevSibling'){
-	if(ix===0){
-	return null;}
-
-	var prev=store.skipWrapper(roots.get(ix-1));
-	store.isBottomTagSelected=prev?store.hasBottom(prev):false;
-	return prev;}else 
-	if(dest==='nextSibling'){
-	if(ix>=roots.size-1){
-	return null;}
-
-	store.isBottomTagSelected=false;
-	return store.skipWrapper(roots.get(ix+1));}
-
-	return null;}
-
-
-
-	var parent=store.get(store.getParent(id));
-	var pchildren=parent.get('children');
-	var pix=pchildren.indexOf(id);
-	if(pix===-1){
-	pix=pchildren.indexOf(store._parents.get(id));}
-
-	if(dest==='prevSibling'){
-	if(pix===0){
-	return getNewSelection('parent',store);}
-
-	var prevCid=store.skipWrapper(pchildren[pix-1]);
-	if(prevCid&&store.hasBottom(prevCid)){
-	store.isBottomTagSelected=true;}
-
-	return prevCid;}
-
-	if(dest==='nextSibling'){
-	if(pix===pchildren.length-1){
-	return getNewSelection('parentBottom',store);}
-
-	store.isBottomTagSelected=false;
-	return store.skipWrapper(pchildren[pix+1]);}
-
-	return null;}
+	var dirToDest = __webpack_require__(179);
+
+
+	var keyCodes = {
+	  '72': 'left', // 'h',
+	  '74': 'down', // 'j',
+	  '75': 'up', // 'k',
+	  '76': 'right', // 'l',
+
+	  '37': 'left',
+	  '38': 'up',
+	  '39': 'right',
+	  '40': 'down'
+	};
+
+	module.exports = function keyboardNav(store, win) {
+	  win = win || window;
+	  return function (e) {
+	    if (win.document.activeElement !== win.document.body) {
+	      return;
+	    }
+	    if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) {
+	      return;
+	    }
+
+	    var direction = keyCodes[e.keyCode];
+	    if (!direction) {
+	      return;
+	    }
+	    e.preventDefault();
+	    var dest = getDest(direction, store);
+	    if (!dest) {
+	      return;
+	    }
+	    var move = getNewSelection(dest, store);
+	    if (move && move !== store.selected) {
+	      store.select(move);
+	    }
+	  };
+	};
+
+	function getDest(dir, store) {
+	  var id = store.selected;
+	  if (!id) {
+	    return null;
+	  }
+	  var bottom = store.isBottomTagSelected;
+	  var node = store.get(id);
+	  var collapsed = node.get('collapsed');
+	  var children = node.get('children');
+	  if (node.get('nodeType') === 'NativeWrapper') {
+	    children = store.get(children[0]).get('children');
+	  }
+	  var hasChildren = children && typeof children !== 'string' && children.length;
+
+	  return dirToDest(dir, bottom, collapsed, hasChildren);
+	}
+
+	function getNewSelection(dest, store) {
+	  var id = store.selected;
+	  if (!id) {
+	    return undefined;
+	  }
+	  var node = store.get(id);
+	  var pid = store.skipWrapper(store.getParent(id), true);
+
+	  if (store.searchRoots && store.searchRoots.contains(id)) {
+	    pid = null;
+	  }
+
+	  if (dest === 'parent') {
+	    return pid;
+	  }
+	  if (dest === 'parentBottom') {
+	    store.isBottomTagSelected = true;
+	    return pid;
+	  }
+
+	  if (dest === 'collapse' || dest === 'uncollapse') {
+	    if (dest === 'collapse') {
+	      store.isBottomTagSelected = false;
+	    }
+	    store.toggleCollapse(id);
+	    return undefined;
+	  }
+
+	  var children = node.get('children');
+	  if (node.get('nodeType') === 'NativeWrapper') {
+	    children = store.get(children[0]).get('children');
+	  }
+
+	  // Children
+	  if (dest === 'firstChild') {
+	    if (typeof children === 'string') {
+	      return getNewSelection('nextSibling', store);
+	    }
+	    store.isBottomTagSelected = false;
+	    return store.skipWrapper(children[0]);
+	  }
+	  if (dest === 'lastChild') {
+	    if (typeof children === 'string') {
+	      return getNewSelection('prevSibling', store);
+	    }
+	    var cid = store.skipWrapper(children[children.length - 1]);
+	    if (cid && !store.hasBottom(cid)) {
+	      store.isBottomTagSelected = false;
+	    }
+	    return cid;
+	  }
+
+	  // Siblings at the root node
+	  if (!pid) {
+	    var roots = store.searchRoots || store.roots;
+	    var ix = roots.indexOf(id);
+	    if (ix === -1) {
+	      ix = roots.indexOf(store._parents.get(id));
+	    }
+	    if (dest === 'prevSibling') {
+	      // prev root
+	      if (ix === 0) {
+	        return null;
+	      }
+	      var prev = store.skipWrapper(roots.get(ix - 1));
+	      store.isBottomTagSelected = prev ? store.hasBottom(prev) : false; // flowtype requires the ternary
+	      return prev;
+	    } else if (dest === 'nextSibling') {
+	      if (ix >= roots.size - 1) {
+	        return null;
+	      }
+	      store.isBottomTagSelected = false;
+	      return store.skipWrapper(roots.get(ix + 1));
+	    }
+	    return null;
+	  }
+
+	  // Siblings
+	  var parent = store.get(store.getParent(id));
+	  var pchildren = parent.get('children');
+	  var pix = pchildren.indexOf(id);
+	  if (pix === -1) {
+	    pix = pchildren.indexOf(store._parents.get(id));
+	  }
+	  if (dest === 'prevSibling') {
+	    if (pix === 0) {
+	      return getNewSelection('parent', store);
+	    }
+	    var prevCid = store.skipWrapper(pchildren[pix - 1]);
+	    if (prevCid && store.hasBottom(prevCid)) {
+	      store.isBottomTagSelected = true;
+	    }
+	    return prevCid;
+	  }
+	  if (dest === 'nextSibling') {
+	    if (pix === pchildren.length - 1) {
+	      return getNewSelection('parentBottom', store);
+	    }
+	    store.isBottomTagSelected = false;
+	    return store.skipWrapper(pchildren[pix + 1]);
+	  }
+	  return null;
+	}
 
 /***/ },
 /* 181 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	function nodeMatchesText(node, needle, key, store) {
+	  var name = node.get('name');
+	  if (node.get('nodeType') === 'Native' && store.get(store.getParent(key)).get('nodeType') === 'NativeWrapper') {
+	    return false;
+	  }
+	  if (name) {
+	    if (node.get('nodeType') !== 'Wrapper' && name.toLowerCase().indexOf(needle) !== -1) {
+	      return true;
+	    }
+	  }
+	  var text = node.get('text');
+	  if (text && text.toLowerCase().indexOf(needle) !== -1) {
+	    return true;
+	  }
+	  var children = node.get('children');
+	  if (typeof children === 'string' && children.toLowerCase().indexOf(needle) !== -1) {
+	    return true;
+	  }
+	  return false;
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-	function nodeMatchesText(node,needle,key,store){
-	var name=node.get('name');
-	if(node.get('nodeType')==='Native'&&store.get(store.getParent(key)).get('nodeType')==='NativeWrapper'){
-	return false;}
-
-	if(name){
-	if(node.get('nodeType')!=='Wrapper'&&name.toLowerCase().indexOf(needle)!==-1){
-	return true;}}
-
-
-	var text=node.get('text');
-	if(text&&text.toLowerCase().indexOf(needle)!==-1){
-	return true;}
-
-	var children=node.get('children');
-	if(typeof children==='string'&&children.toLowerCase().indexOf(needle)!==-1){
-	return true;}
-
-	return false;}
-
-
-	module.exports=nodeMatchesText;
+	module.exports = nodeMatchesText;
 
 /***/ },
 /* 182 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
-
-
-
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-
-	module.exports=function(name){
-	class Wrapper extends React.Component{
-
-
-
-
-	getChildContext(){
-	return {[name]:this.props.store};}
-
-	render(){
-	return this.props.children();}}
-
-
-	Wrapper.childContextTypes={
-	[name]:React.PropTypes.object};
-
-	Wrapper.displayName='StoreProvider('+name+')';
-	return Wrapper;};
+	module.exports = function (name) {
+	  class Wrapper extends React.Component {
+	    getChildContext() {
+	      return { [name]: this.props.store };
+	    }
+	    render() {
+	      return this.props.children();
+	    }
+	  }
+	  Wrapper.childContextTypes = {
+	    [name]: React.PropTypes.object
+	  };
+	  Wrapper.displayName = 'StoreProvider(' + name + ')';
+	  return Wrapper;
+	};
 
 /***/ },
 /* 183 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	/* global chrome */
 
-
-
-
-
-
-
-
-
-
-
-
-	module.exports=function(scriptName,done){
-	var src=`
+	module.exports = function (scriptName, done) {
+	  var src = `
 	  // the prototype stuff is in case document.createElement has been modified
 	  var script = document.constructor.prototype.createElement.call(document, 'script');
 	  script.src = "${ scriptName }";
@@ -21322,1300 +21265,1264 @@
 	  script.parentNode.removeChild(script);
 	  `;
 
-	chrome.devtools.inspectedWindow.eval(src,function(res,err){
-	if(err){}
-
-
-	done();});};
+	  chrome.devtools.inspectedWindow.eval(src, function (res, err) {
+	    if (err) {}
+	    done();
+	  });
+	};
 
 /***/ },
 /* 184 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+
 	'use strict';
 
+	const React = __webpack_require__(3);
+	const immutable = __webpack_require__(76);
 
+	const StateRecord = immutable.Record({
+	  enabled: false
+	});
 
+	class BananaSlugFrontendControl extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this._toggle = this._toggle.bind(this);
+	    this._defaultState = new StateRecord();
+	  }
 
+	  componentDidMount() {
+	    if (!this.props.state !== this._defaultState) {
+	      this.props.onChange(this._defaultState);
+	    }
+	  }
 
+	  render() {
+	    var state = this.props.state || this._defaultState;
+	    return React.createElement(
+	      'div',
+	      { style: styles.container, onClick: this._toggle, tabIndex: 0 },
+	      React.createElement('input', {
+	        style: styles.checkbox,
+	        type: 'checkbox',
+	        checked: state.enabled,
+	        readOnly: true
+	      }),
+	      React.createElement(
+	        'span',
+	        null,
+	        'Trace React updates'
+	      )
+	    );
+	  }
 
+	  _toggle() {
+	    var state = this.props.state || this._defaultState;
+	    var nextState = state.merge({
+	      enabled: !state.enabled
+	    });
 
+	    this.props.onChange(nextState);
+	  }
+	}
 
+	var styles = {
+	  checkbox: {
+	    pointerEvents: 'none'
+	  },
+	  container: {
+	    WebkitUserSelect: 'none',
+	    cursor: 'pointer',
+	    display: 'inline-block',
+	    fontFamily: 'arial',
+	    fontSize: '12px',
+	    outline: 'none',
+	    userSelect: 'none'
+	  }
+	};
 
-
-
-	const React=__webpack_require__(3);
-	const immutable=__webpack_require__(76);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	const StateRecord=immutable.Record({
-	enabled:false});
-
-
-	class BananaSlugFrontendControl extends React.Component{
-
-
-
-
-
-
-
-	constructor(props){
-	super(props);
-	this._toggle=this._toggle.bind(this);
-	this._defaultState=new StateRecord();}
-
-
-	componentDidMount(){
-	if(!this.props.state!==this._defaultState){
-	this.props.onChange(this._defaultState);}}
-
-
-
-	render(){
-	var state=this.props.state||this._defaultState;
-	return (
-	React.createElement('div',{style:styles.container,onClick:this._toggle,tabIndex:0},
-	React.createElement('input',{
-	style:styles.checkbox,
-	type:'checkbox',
-	checked:state.enabled,
-	readOnly:true}),
-
-	React.createElement('span',null,'Trace React updates')));}
-
-
-
-
-	_toggle(){
-	var state=this.props.state||this._defaultState;
-	var nextState=state.merge({
-	enabled:!state.enabled});
-
-
-	this.props.onChange(nextState);}}
-
-
-
-	var styles={
-	checkbox:{
-	pointerEvents:'none'},
-
-	container:{
-	WebkitUserSelect:'none',
-	cursor:'pointer',
-	display:'inline-block',
-	fontFamily:'arial',
-	fontSize:'12px',
-	outline:'none',
-	userSelect:'none'}};
-
-
-
-	module.exports=BananaSlugFrontendControl;
+	module.exports = BananaSlugFrontendControl;
 
 /***/ },
 /* 185 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
 
 
+	class BlurInput extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = { text: '' + this.props.value };
+	  }
 
+	  componentWillReceiveProps(nextProps) {
+	    this.setState({ text: '' + nextProps.value });
+	  }
 
+	  done() {
+	    if (this.state.text !== '' + this.props.value) {
+	      this.props.onChange(this.state.text);
+	    }
+	  }
 
+	  onKeyDown(e) {
+	    if (e.key === 'Enter') {
+	      this.done();
+	      return;
+	    } else if (e.key === 'ArrowUp') {
+	      if (+this.state.text + '' === this.state.text) {
+	        this.props.onChange(+this.state.text + 1);
+	      }
+	    } else if (e.key === 'ArrowDown') {
+	      if (+this.state.text + '' === this.state.text) {
+	        this.props.onChange(+this.state.text - 1);
+	      }
+	    }
+	  }
 
+	  render() {
+	    return React.createElement('input', {
+	      value: this.state.text,
+	      ref: i => this.node = i,
+	      onChange: e => this.setState({ text: e.target.value }),
+	      onBlur: this.done.bind(this),
+	      onKeyDown: e => this.onKeyDown(e)
+	    });
+	  }
+	}
 
-
-
-	var React=__webpack_require__(3);
-
-
-
-
-
-
-
-
-
-
-
-	class BlurInput extends React.Component{
-
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={text:''+this.props.value};}
-
-
-	componentWillReceiveProps(nextProps){
-	this.setState({text:''+nextProps.value});}
-
-
-	done(){
-	if(this.state.text!==''+this.props.value){
-	this.props.onChange(this.state.text);}}
-
-
-
-	onKeyDown(e){
-	if(e.key==='Enter'){
-	this.done();
-	return;}else 
-	if(e.key==='ArrowUp'){
-	if(+this.state.text+''===this.state.text){
-	this.props.onChange(+this.state.text+1);}}else 
-
-	if(e.key==='ArrowDown'){
-	if(+this.state.text+''===this.state.text){
-	this.props.onChange(+this.state.text-1);}}}
-
-
-
-
-	render(){
-	return (
-	React.createElement('input',{
-	value:this.state.text,
-	ref:i => this.node=i,
-	onChange:e => this.setState({text:e.target.value}),
-	onBlur:this.done.bind(this),
-	onKeyDown:e => this.onKeyDown(e)}));}}
-
-
-
-
-
-	module.exports=BlurInput;
+	module.exports = BlurInput;
 
 /***/ },
 /* 186 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var StyleEdit = __webpack_require__(187);
 
+	function shallowClone(obj) {
+	  var nobj = {};
+	  for (var n in obj) {
+	    nobj[n] = obj[n];
+	  }
+	  return nobj;
+	}
 
+	class NativeStyler extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = { style: null };
+	  }
 
+	  componentWillMount() {
+	    this.props.bridge.call('rn-style:get', this.props.id, style => {
+	      this.setState({ style });
+	    });
+	  }
 
+	  componentWillReceiveProps(nextProps) {
+	    if (nextProps.id === this.props.id) {
+	      return;
+	    }
+	    this.setState({ style: null });
+	    this.props.bridge.call('rn-style:get', nextProps.id, style => {
+	      this.setState({ style });
+	    });
+	  }
 
+	  _handleStyleChange(attr, val) {
+	    if (this.state.style) {
+	      this.state.style[attr] = val;
+	    }
+	    this.props.bridge.send('rn-style:set', { id: this.props.id, attr, val });
+	    this.setState({ style: this.state.style });
+	  }
 
+	  _handleStyleRename(oldName, newName, val) {
+	    var style = shallowClone(this.state.style);
+	    delete style[oldName];
+	    style[newName] = val;
+	    this.props.bridge.send('rn-style:rename', { id: this.props.id, oldName, newName, val });
+	    this.setState({ style });
+	  }
 
+	  render() {
+	    if (!this.state.style) {
+	      return React.createElement(
+	        'em',
+	        null,
+	        'loading'
+	      );
+	    }
+	    return React.createElement(StyleEdit, {
+	      style: this.state.style,
+	      onRename: this._handleStyleRename.bind(this),
+	      onChange: this._handleStyleChange.bind(this)
+	    });
+	  }
+	}
 
-
-	var React=__webpack_require__(3);
-	var StyleEdit=__webpack_require__(187);
-
-	function shallowClone(obj){
-	var nobj={};
-	for(var n in obj){
-	nobj[n]=obj[n];}
-
-	return nobj;}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class NativeStyler extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={style:null};}
-
-
-	componentWillMount(){
-	this.props.bridge.call('rn-style:get',this.props.id,style => {
-	this.setState({style});});}
-
-
-
-	componentWillReceiveProps(nextProps){
-	if(nextProps.id===this.props.id){
-	return;}
-
-	this.setState({style:null});
-	this.props.bridge.call('rn-style:get',nextProps.id,style => {
-	this.setState({style});});}
-
-
-
-	_handleStyleChange(attr,val){
-	if(this.state.style){
-	this.state.style[attr]=val;}
-
-	this.props.bridge.send('rn-style:set',{id:this.props.id,attr,val});
-	this.setState({style:this.state.style});}
-
-
-	_handleStyleRename(oldName,newName,val){
-	var style=shallowClone(this.state.style);
-	delete style[oldName];
-	style[newName]=val;
-	this.props.bridge.send('rn-style:rename',{id:this.props.id,oldName,newName,val});
-	this.setState({style});}
-
-
-	render(){
-	if(!this.state.style){
-	return React.createElement('em',null,'loading');}
-
-	return (
-	React.createElement(StyleEdit,{
-	style:this.state.style,
-	onRename:this._handleStyleRename.bind(this),
-	onChange:this._handleStyleChange.bind(this)}));}}
-
-
-
-
-
-	module.exports=NativeStyler;
+	module.exports = NativeStyler;
 
 /***/ },
 /* 187 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _keys=__webpack_require__(36);var _keys2=_interopRequireDefault(_keys);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _keys = __webpack_require__(36);
 
+	var _keys2 = _interopRequireDefault(_keys);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var React = __webpack_require__(3);
+	var BlurInput = __webpack_require__(185);
 
+	class StyleEdit extends React.Component {
 
+	  constructor(props) {
+	    super(props);
+	    this.state = { newAttr: '', newValue: '' };
+	  }
 
+	  onNew(val) {
+	    this.props.onChange(this.state.newAttr, val);
+	    this.setState({ newAttr: '', newValue: '' });
+	  }
 
+	  render() {
+	    var attrs = (0, _keys2.default)(this.props.style);
+	    return React.createElement(
+	      'ul',
+	      { style: styles.container },
+	      attrs.map(name => React.createElement(
+	        'li',
+	        { style: styles.attr },
+	        React.createElement(BlurInput, {
+	          value: name,
+	          onChange: newName => this.props.onRename(name, '' + newName, this.props.style[name])
+	        }),
+	        ':',
+	        React.createElement(BlurInput, {
+	          value: this.props.style[name],
+	          onChange: val => this.props.onChange(name, val)
+	        })
+	      )),
+	      React.createElement(
+	        'li',
+	        { style: styles.attr },
+	        React.createElement(BlurInput, {
+	          value: this.state.newAttr,
+	          onChange: newAttr => this.setState({ newAttr: '' + newAttr })
+	        }),
+	        ':',
+	        this.state.newAttr && React.createElement(BlurInput, {
+	          value: '',
+	          onChange: val => this.onNew(val)
+	        })
+	      )
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    listStyle: 'none',
+	    padding: 0,
+	    margin: 0
+	  },
+	  attr: {
+	    padding: 2
+	  }
+	};
 
-
-	var React=__webpack_require__(3);
-	var BlurInput=__webpack_require__(185);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	class StyleEdit extends React.Component{
-
-
-
-
-	constructor(props){
-	super(props);
-	this.state={newAttr:'',newValue:''};}
-
-
-	onNew(val){
-	this.props.onChange(this.state.newAttr,val);
-	this.setState({newAttr:'',newValue:''});}
-
-
-	render(){
-	var attrs=(0,_keys2.default)(this.props.style);
-	return (
-	React.createElement('ul',{style:styles.container},
-	attrs.map(name => 
-	React.createElement('li',{style:styles.attr},
-	React.createElement(BlurInput,{
-	value:name,
-	onChange:newName => this.props.onRename(name,''+newName,this.props.style[name])}),':',
-
-
-	React.createElement(BlurInput,{
-	value:this.props.style[name],
-	onChange:val => this.props.onChange(name,val)}))),
-
-
-
-	React.createElement('li',{style:styles.attr},
-	React.createElement(BlurInput,{
-	value:this.state.newAttr,
-	onChange:newAttr => this.setState({newAttr:''+newAttr})}),':',
-
-
-	this.state.newAttr&&React.createElement(BlurInput,{
-	value:'',
-	onChange:val => this.onNew(val)}))));}}
-
-
-
-
-
-
-
-	var styles={
-	container:{
-	listStyle:'none',
-	padding:0,
-	margin:0},
-
-	attr:{
-	padding:2}};
-
-
-
-	module.exports=StyleEdit;
+	module.exports = StyleEdit;
 
 /***/ },
 /* 188 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var decorate = __webpack_require__(7);
 
+	class ElementPanel extends React.Component {
 
+	  render() {
+	    if (!this.props.dataIDs.length) {
+	      return React.createElement('span', null);
+	    }
+	    return React.createElement(
+	      'div',
+	      null,
+	      'Relay Nodes',
+	      React.createElement(
+	        'ul',
+	        { style: styles.dataIDs },
+	        this.props.dataIDs.map(({ id, queries }) => React.createElement(
+	          'li',
+	          { style: styles.dataNode },
+	          React.createElement(
+	            'div',
+	            { style: styles.dataID, onClick: () => this.props.jumpToData(id) },
+	            'ID: ',
+	            id
+	          ),
+	          React.createElement(
+	            'ul',
+	            { style: styles.queries },
+	            queries.map(query => React.createElement(
+	              'li',
+	              { style: styles.queryID, onClick: () => {
+	                  var queryID = query.get('id');
+	                  if (queryID) {
+	                    this.props.jumpToQuery(queryID);
+	                  }
+	                } },
+	              query.get('name')
+	            )),
+	            !queries.length && React.createElement(
+	              'li',
+	              { style: styles.noQueries },
+	              'No Queries'
+	            )
+	          )
+	        ))
+	      )
+	    );
+	  }
+	}
 
+	var styles = {
+	  dataNode: {
+	    marginBottom: 5,
+	    border: '1px solid #ccc'
+	  },
+	  dataIDs: {
+	    listStyle: 'none',
+	    padding: 0,
+	    margin: 0
+	  },
+	  queries: {
+	    listStyle: 'none',
+	    padding: 0,
+	    margin: 0
+	  },
+	  dataID: {
+	    cursor: 'pointer',
+	    padding: '2px 4px',
+	    backgroundColor: '#ccc'
+	  },
+	  queryID: {
+	    cursor: 'pointer',
+	    padding: '2px 4px'
+	  },
+	  noQueries: {
+	    color: '#999',
+	    padding: '2px 4px'
+	  }
+	};
 
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var decorate=__webpack_require__(7);
-
-	class ElementPanel extends React.Component{
-
-
-
-
-
-
-	render(){
-	if(!this.props.dataIDs.length){
-	return React.createElement('span',null);}
-
-	return (
-	React.createElement('div',null,'Relay Nodes',
-
-	React.createElement('ul',{style:styles.dataIDs},
-	this.props.dataIDs.map(({id,queries}) => 
-	React.createElement('li',{style:styles.dataNode},
-	React.createElement('div',{style:styles.dataID,onClick:() => this.props.jumpToData(id)},'ID: ',
-	id),
-
-	React.createElement('ul',{style:styles.queries},
-	queries.map(query => 
-	React.createElement('li',{style:styles.queryID,onClick:() => {
-	var queryID=query.get('id');
-	if(queryID){
-	this.props.jumpToQuery(queryID);}}},
-
-
-	query.get('name'))),
-
-
-	!queries.length&&React.createElement('li',{style:styles.noQueries},'No Queries')))))));}}
-
-
-
-
-
-
-
-
-
-	var styles={
-	dataNode:{
-	marginBottom:5,
-	border:'1px solid #ccc'},
-
-	dataIDs:{
-	listStyle:'none',
-	padding:0,
-	margin:0},
-
-	queries:{
-	listStyle:'none',
-	padding:0,
-	margin:0},
-
-	dataID:{
-	cursor:'pointer',
-	padding:'2px 4px',
-	backgroundColor:'#ccc'},
-
-	queryID:{
-	cursor:'pointer',
-	padding:'2px 4px'},
-
-	noQueries:{
-	color:'#999',
-	padding:'2px 4px'}};
-
-
-
-	module.exports=decorate({
-	store:'relayStore',
-	listeners(props,store){
-	return [props.id];},
-
-	shouldUpdate(props,prevProps){
-	return props.id!==prevProps.id;},
-
-	props(store,props){
-	var dataIDs=[];
-	if(store.nodesToDataIDs[props.id]){
-	for(var id of store.nodesToDataIDs[props.id]){
-	dataIDs.push({
-	id,
-	queries:(store.queriesByDataID[id]||[]).map(qid => store.queries.get(qid))});}}
-
-
-
-	return {
-	dataIDs,
-	jumpToData:dataID => store.jumpToDataID(dataID),
-	jumpToQuery:queryID => store.jumpToQuery(queryID)};}},
-
-
-	ElementPanel);
+	module.exports = decorate({
+	  store: 'relayStore',
+	  listeners(props, store) {
+	    return [props.id];
+	  },
+	  shouldUpdate(props, prevProps) {
+	    return props.id !== prevProps.id;
+	  },
+	  props(store, props) {
+	    var dataIDs = [];
+	    if (store.nodesToDataIDs[props.id]) {
+	      for (var id of store.nodesToDataIDs[props.id]) {
+	        dataIDs.push({
+	          id,
+	          queries: (store.queriesByDataID[id] || []).map(qid => store.queries.get(qid))
+	        });
+	      }
+	    }
+	    return {
+	      dataIDs,
+	      jumpToData: dataID => store.jumpToDataID(dataID),
+	      jumpToQuery: queryID => store.jumpToQuery(queryID)
+	    };
+	  }
+	}, ElementPanel);
 
 /***/ },
 /* 189 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var decorate = __webpack_require__(7);
+	var QueryList = __webpack_require__(191);
+	var QueryViewer = __webpack_require__(192);
+	var SplitPane = __webpack_require__(98);
 
+	class QueriesTab extends React.Component {
+	  render() {
+	    var contents;
+	    if (!this.props.isSplit) {
+	      contents = React.createElement(QueryList, null);
+	    } else {
+	      contents = React.createElement(SplitPane, {
+	        initialWidth: 500,
+	        left: () => React.createElement(QueryList, null),
+	        right: () => React.createElement(QueryViewer, null)
+	      });
+	    }
 
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      contents
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    fontFamily: 'Menlo, sans-serif',
+	    fontSize: 12,
+	    flex: 1,
+	    display: 'flex'
+	  }
+	};
 
-
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var decorate=__webpack_require__(7);
-	var QueryList=__webpack_require__(191);
-	var QueryViewer=__webpack_require__(192);
-	var SplitPane=__webpack_require__(98);
-
-	class QueriesTab extends React.Component{
-
-
-
-	render(){
-	var contents;
-	if(!this.props.isSplit){
-	contents=React.createElement(QueryList,null);}else 
-	{
-	contents=
-	React.createElement(SplitPane,{
-	initialWidth:500,
-	left:() => React.createElement(QueryList,null),
-	right:() => React.createElement(QueryViewer,null)});}
-
-
-
-
-	return (
-	React.createElement('div',{style:styles.container},
-	contents));}}
-
-
-
-
-
-	var styles={
-	container:{
-	fontFamily:'Menlo, sans-serif',
-	fontSize:12,
-	flex:1,
-	display:'flex'}};
-
-
-
-	module.exports=decorate({
-	store:'relayStore',
-	listeners:() => ['selectedQuery'],
-	props(store){
-	return {
-	isSplit:!!store.selectedQuery};}},
-
-
-	QueriesTab);
+	module.exports = decorate({
+	  store: 'relayStore',
+	  listeners: () => ['selectedQuery'],
+	  props(store) {
+	    return {
+	      isSplit: !!store.selectedQuery
+	    };
+	  }
+	}, QueriesTab);
 
 /***/ },
 /* 190 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
 
+	var _extends2 = __webpack_require__(21);
 
+	var _extends3 = _interopRequireDefault(_extends2);
 
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+	var React = __webpack_require__(3);
 
+	class Query extends React.Component {
+	  render() {
+	    var data = this.props.data;
+	    var containerStyle = styles.container;
+	    if (this.props.isSelected) {
+	      containerStyle = styles.containerSelected;
+	    } else if (this.props.oddRow) {
+	      containerStyle = styles.containeroOddRow;
+	    }
 
+	    var status = data.get('status');
+	    var statusStyle = (0, _extends3.default)({}, styles.status, {
+	      backgroundColor: statusColors[status] || statusColors.error
+	    });
 
+	    const start = data.get('start');
+	    const end = data.get('end');
 
+	    return React.createElement(
+	      'tr',
+	      { onClick: this.props.onSelect, style: containerStyle },
+	      React.createElement(
+	        'td',
+	        { style: styles.tdFirst },
+	        React.createElement('span', { style: statusStyle, title: status })
+	      ),
+	      React.createElement(
+	        'td',
+	        { style: styles.tdName },
+	        data.get('name')
+	      ),
+	      React.createElement(
+	        'td',
+	        { style: styles.td },
+	        Math.round(start) / 1000,
+	        's'
+	      ),
+	      React.createElement(
+	        'td',
+	        { style: styles.td },
+	        Math.round(end - start),
+	        'ms'
+	      )
+	    );
+	  }
+	}
 
+	var statusColors = {
+	  pending: 'orange',
+	  success: 'green',
+	  failure: 'red',
+	  error: '#aaa'
+	};
 
+	var baseContainer = {
+	  cursor: 'pointer',
+	  fontSize: 11,
+	  height: 21,
+	  lineHeight: '21px',
+	  fontFamily: "'Lucida Grande', sans-serif"
+	};
 
+	var baseTD = {
+	  whiteSpace: 'nowrap',
+	  'padding': '1px 4px',
+	  'lineHeight': '17px',
+	  'borderLeft': '1px solid #e1e1e1'
+	};
 
+	var styles = {
+	  container: baseContainer,
 
-	var React=__webpack_require__(3);
+	  containerSelected: (0, _extends3.default)({}, baseContainer, {
+	    backgroundColor: '#3879d9',
+	    color: 'white'
+	  }),
 
-	class Query extends React.Component{
+	  containeroOddRow: (0, _extends3.default)({}, baseContainer, {
+	    backgroundColor: '#f5f5f5'
+	  }),
 
+	  td: baseTD,
 
+	  tdFirst: (0, _extends3.default)({}, baseTD, {
+	    borderLeft: ''
+	  }),
 
+	  tdName: (0, _extends3.default)({}, baseTD, {
+	    width: '100%'
+	  }),
 
+	  status: {
+	    display: 'inline-block',
+	    width: 11,
+	    height: 11,
+	    borderRadius: 6,
+	    backgroundColor: '#aaa'
+	  }
+	};
 
-	render(){
-	var data=this.props.data;
-	var containerStyle=styles.container;
-	if(this.props.isSelected){
-	containerStyle=styles.containerSelected;}else 
-	if(this.props.oddRow){
-	containerStyle=styles.containeroOddRow;}
-
-
-	var status=data.get('status');
-	var statusStyle=(0,_extends3.default)({},
-	styles.status,{
-	backgroundColor:statusColors[status]||statusColors.error});
-
-
-	const start=data.get('start');
-	const end=data.get('end');
-
-	return (
-	React.createElement('tr',{onClick:this.props.onSelect,style:containerStyle},
-	React.createElement('td',{style:styles.tdFirst},
-	React.createElement('span',{style:statusStyle,title:status})),
-
-	React.createElement('td',{style:styles.tdName},
-	data.get('name')),
-
-	React.createElement('td',{style:styles.td},
-	Math.round(start)/1000,'s'),
-
-	React.createElement('td',{style:styles.td},
-	Math.round(end-start),'ms')));}}
-
-
-
-
-
-
-	var statusColors={
-	pending:'orange',
-	success:'green',
-	failure:'red',
-	error:'#aaa'};
-
-
-	var baseContainer={
-	cursor:'pointer',
-	fontSize:11,
-	height:21,
-	lineHeight:'21px',
-	fontFamily:"'Lucida Grande', sans-serif"};
-
-
-	var baseTD={
-	whiteSpace:'nowrap',
-	'padding':'1px 4px',
-	'lineHeight':'17px',
-	'borderLeft':'1px solid #e1e1e1'};
-
-
-	var styles={
-	container:baseContainer,
-
-	containerSelected:(0,_extends3.default)({},
-	baseContainer,{
-	backgroundColor:'#3879d9',
-	color:'white'}),
-
-
-	containeroOddRow:(0,_extends3.default)({},
-	baseContainer,{
-	backgroundColor:'#f5f5f5'}),
-
-
-	td:baseTD,
-
-	tdFirst:(0,_extends3.default)({},
-	baseTD,{
-	borderLeft:''}),
-
-
-	tdName:(0,_extends3.default)({},
-	baseTD,{
-	width:'100%'}),
-
-
-	status:{
-	display:'inline-block',
-	width:11,
-	height:11,
-	borderRadius:6,
-	backgroundColor:'#aaa'}};
-
-
-
-	module.exports=Query;
+	module.exports = Query;
 
 /***/ },
 /* 191 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var decorate = __webpack_require__(7);
+	var Query = __webpack_require__(190);
 
+	class QueryList extends React.Component {
 
+	  render() {
+	    if (!this.props.queries.count()) {
+	      return React.createElement(
+	        'div',
+	        { style: styles.empty },
+	        'No Relay Queries logged'
+	      );
+	    }
 
+	    const rows = [];
+	    let odd = false;
+	    let lastRequestNumber = -1;
+	    this.props.queries.forEach(query => {
+	      const requestNumber = query.get('requestNumber');
+	      if (lastRequestNumber !== requestNumber) {
+	        lastRequestNumber = requestNumber;
+	        rows.push(React.createElement(
+	          'tr',
+	          { key: 'request' + requestNumber },
+	          React.createElement(
+	            'td',
+	            { colSpan: '4', style: styles.grouper },
+	            'Request ',
+	            requestNumber
+	          )
+	        ));
+	        odd = false;
+	      }
+	      rows.push(React.createElement(Query, {
+	        data: query,
+	        isSelected: query.get('id') === this.props.selectedQuery,
+	        key: query.get('id'),
+	        oddRow: odd,
+	        onSelect: () => this.props.selectQuery(query.get('id'))
+	      }));
+	      odd = !odd;
+	    });
 
+	    return React.createElement(
+	      'div',
+	      { style: styles.container },
+	      React.createElement(
+	        'table',
+	        { style: styles.table },
+	        React.createElement(
+	          'tbody',
+	          null,
+	          rows
+	        )
+	      )
+	    );
+	  }
+	}
 
+	var styles = {
+	  container: {
+	    position: 'relative',
+	    flex: 1,
+	    overflow: 'scroll'
+	  },
 
+	  table: {
+	    flex: 1,
+	    borderCollapse: 'collapse',
+	    width: '100%'
+	  },
 
+	  grouper: {
+	    fontWeight: 'bold',
+	    fontSize: 10
+	  },
 
+	  empty: {
+	    flex: 1,
+	    padding: 50,
+	    textAlign: 'center'
+	  }
+	};
 
-
-
-
-	var React=__webpack_require__(3);
-	var decorate=__webpack_require__(7);
-	var Query=__webpack_require__(190);
-
-	class QueryList extends React.Component{
-
-
-
-
-
-
-	render(){
-	if(!this.props.queries.count()){
-	return React.createElement('div',{style:styles.empty},'No Relay Queries logged');}
-
-
-	const rows=[];
-	let odd=false;
-	let lastRequestNumber=-1;
-	this.props.queries.forEach(query => {
-	const requestNumber=query.get('requestNumber');
-	if(lastRequestNumber!==requestNumber){
-	lastRequestNumber=requestNumber;
-	rows.push(
-	React.createElement('tr',{key:'request'+requestNumber},
-	React.createElement('td',{colSpan:'4',style:styles.grouper},'Request ',
-	requestNumber)));
-
-
-
-	odd=false;}
-
-	rows.push(
-	React.createElement(Query,{
-	data:query,
-	isSelected:query.get('id')===this.props.selectedQuery,
-	key:query.get('id'),
-	oddRow:odd,
-	onSelect:() => this.props.selectQuery(query.get('id'))}));
-
-
-	odd=!odd;});
-
-
-	return (
-	React.createElement('div',{style:styles.container},
-	React.createElement('table',{style:styles.table},
-	React.createElement('tbody',null,
-	rows))));}}
-
-
-
-
-
-
-
-	var styles={
-	container:{
-	position:'relative',
-	flex:1,
-	overflow:'scroll'},
-
-
-	table:{
-	flex:1,
-	borderCollapse:'collapse',
-	width:'100%'},
-
-
-	grouper:{
-	fontWeight:'bold',
-	fontSize:10},
-
-
-	empty:{
-	flex:1,
-	padding:50,
-	textAlign:'center'}};
-
-
-
-	module.exports=decorate({
-	store:'relayStore',
-	listeners:() => ['queries','selectedQuery'],
-	props(store,props){
-	return {
-	queries:store.queries,
-	selectQuery:id => store.selectQuery(id),
-	selectedQuery:store.selectedQuery};}},
-
-
-	QueryList);
+	module.exports = decorate({
+	  store: 'relayStore',
+	  listeners: () => ['queries', 'selectedQuery'],
+	  props(store, props) {
+	    return {
+	      queries: store.queries,
+	      selectQuery: id => store.selectQuery(id),
+	      selectedQuery: store.selectedQuery
+	    };
+	  }
+	}, QueryList);
 
 /***/ },
 /* 192 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var _DataView = __webpack_require__(97);
 
+	var _DataView2 = _interopRequireDefault(_DataView);
 
+	var _DetailPane = __webpack_require__(99);
 
+	var _DetailPane2 = _interopRequireDefault(_DetailPane);
 
+	var _DetailPaneSection = __webpack_require__(100);
 
+	var _DetailPaneSection2 = _interopRequireDefault(_DetailPaneSection);
 
+	var _react = __webpack_require__(3);
 
+	var _react2 = _interopRequireDefault(_react);
 
+	var _decorate = __webpack_require__(7);
 
+	var _decorate2 = _interopRequireDefault(_decorate);
 
+	var _tidyGraphQL = __webpack_require__(196);
 
+	var _tidyGraphQL2 = _interopRequireDefault(_tidyGraphQL);
 
-	var _DataView=__webpack_require__(97);var _DataView2=_interopRequireDefault(_DataView);
-	var _DetailPane=__webpack_require__(99);var _DetailPane2=_interopRequireDefault(_DetailPane);
-	var _DetailPaneSection=__webpack_require__(100);var _DetailPaneSection2=_interopRequireDefault(_DetailPaneSection);
-	var _react=__webpack_require__(3);var _react2=_interopRequireDefault(_react);
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-	var _decorate=__webpack_require__(7);var _decorate2=_interopRequireDefault(_decorate);
-	var _tidyGraphQL=__webpack_require__(196);var _tidyGraphQL2=_interopRequireDefault(_tidyGraphQL);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
+	class QueryViewer extends _react2.default.Component {
+	  render() {
+	    var data = this.props.data;
+	    var status = data.get('status');
 
-	class QueryViewer extends _react2.default.Component{
+	    var resultBlock = null;
+	    if (status === 'success') {
+	      resultBlock = _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Response' },
+	        _react2.default.createElement(_DataView2.default, {
+	          data: data.get('response'),
+	          readOnly: true,
+	          showMenu: false,
+	          inspect: this.props.inspect,
+	          path: ['response']
+	        })
+	      );
+	    } else if (status === 'failure') {
+	      resultBlock = _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Error' },
+	        _react2.default.createElement(_DataView2.default, {
+	          data: data.get('error'),
+	          readOnly: true,
+	          showMenu: false,
+	          inspect: this.props.inspect,
+	          path: ['error']
+	        })
+	      );
+	    }
 
+	    const start = data.get('start');
+	    const end = data.get('end');
 
+	    return _react2.default.createElement(
+	      _DetailPane2.default,
+	      { header: data.get('type') + ': ' + data.get('name') },
+	      _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Start' },
+	        _react2.default.createElement(
+	          'div',
+	          null,
+	          Math.round(start) / 1000,
+	          's since page load'
+	        )
+	      ),
+	      _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Status' },
+	        _react2.default.createElement(
+	          'div',
+	          null,
+	          status
+	        )
+	      ),
+	      _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Duration' },
+	        _react2.default.createElement(
+	          'div',
+	          null,
+	          Math.round(end - start),
+	          'ms'
+	        )
+	      ),
+	      _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Query' },
+	        _react2.default.createElement(
+	          'div',
+	          { style: styles.query },
+	          (0, _tidyGraphQL2.default)(data.get('text'))
+	        )
+	      ),
+	      _react2.default.createElement(
+	        _DetailPaneSection2.default,
+	        { title: 'Variables' },
+	        _react2.default.createElement(_DataView2.default, {
+	          data: data.get('variables'),
+	          readOnly: true,
+	          showMenu: false,
+	          inspect: this.props.inspect,
+	          path: ['variables']
+	        })
+	      ),
+	      resultBlock
+	    );
+	  }
+	}
 
+	var styles = {
+	  query: {
+	    cursor: 'text',
+	    fontFamily: 'monospace',
+	    userSelect: 'text',
+	    MozUserSelect: 'text',
+	    WebkitUserSelect: 'text',
+	    whiteSpace: 'pre',
+	    wordWrap: 'break-word'
+	  }
+	};
 
-	render(){
-	var data=this.props.data;
-	var status=data.get('status');
-
-	var resultBlock=null;
-	if(status==='success'){
-	resultBlock=
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Response'},
-	_react2.default.createElement(_DataView2.default,{
-	data:data.get('response'),
-	readOnly:true,
-	showMenu:false,
-	inspect:this.props.inspect,
-	path:['response']}));}else 
-
-
-	if(status==='failure'){
-	resultBlock=
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Error'},
-	_react2.default.createElement(_DataView2.default,{
-	data:data.get('error'),
-	readOnly:true,
-	showMenu:false,
-	inspect:this.props.inspect,
-	path:['error']}));}
-
-
-
-
-	const start=data.get('start');
-	const end=data.get('end');
-
-	return (
-	_react2.default.createElement(_DetailPane2.default,{header:data.get('type')+': '+data.get('name')},
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Start'},
-	_react2.default.createElement('div',null,
-	Math.round(start)/1000,'s since page load')),
-
-
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Status'},
-	_react2.default.createElement('div',null,
-	status)),
-
-
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Duration'},
-	_react2.default.createElement('div',null,
-	Math.round(end-start),'ms')),
-
-
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Query'},
-	_react2.default.createElement('div',{style:styles.query},
-	(0,_tidyGraphQL2.default)(data.get('text')))),
-
-
-	_react2.default.createElement(_DetailPaneSection2.default,{title:'Variables'},
-	_react2.default.createElement(_DataView2.default,{
-	data:data.get('variables'),
-	readOnly:true,
-	showMenu:false,
-	inspect:this.props.inspect,
-	path:['variables']})),
-
-
-	resultBlock));}}
-
-
-
-
-
-	var styles={
-	query:{
-	cursor:'text',
-	fontFamily:'monospace',
-	userSelect:'text',
-	MozUserSelect:'text',
-	WebkitUserSelect:'text',
-	whiteSpace:'pre',
-	wordWrap:'break-word'}};
-
-
-
-	module.exports=(0,_decorate2.default)({
-	store:'relayStore',
-	listeners:(props,store) => ['selectedQuery',store.selectedQuery],
-	props(store){
-	return {
-	data:store.queries.get(store.selectedQuery),
-	inspect:store.inspect.bind(store,store.selectedQuery)};}},
-
-
-	QueryViewer);
+	module.exports = (0, _decorate2.default)({
+	  store: 'relayStore',
+	  listeners: (props, store) => ['selectedQuery', store.selectedQuery],
+	  props(store) {
+	    return {
+	      data: store.queries.get(store.selectedQuery),
+	      inspect: store.inspect.bind(store, store.selectedQuery)
+	    };
+	  }
+	}, QueryViewer);
 
 /***/ },
 /* 193 */
 /***/ function(module, exports, __webpack_require__) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	var React = __webpack_require__(3);
+	var provideStore = __webpack_require__(182);
 
+	var RelayStore = __webpack_require__(194);
+	var QueriesTab = __webpack_require__(189);
+	// var StoreTab = require('./StoreTab');
+	var ElementPanel = __webpack_require__(188);
 
+	var StoreWrapper = provideStore('relayStore');
 
+	class RelayPlugin {
 
+	  constructor(store, bridge, refresh) {
+	    this.bridge = bridge;
+	    this.store = store;
+	    this.hasRelay = false;
+	    this.relayStore = new RelayStore(bridge, store);
+	    // TODO (kassens): There's a race condition here. The Relay backend
+	    // implements this call and is initialized from the injected script whereas
+	    // this file is called from the Panel.
+	    setTimeout(() => {
+	      bridge.call('relay:check', [], hasRelay => {
+	        this.hasRelay = hasRelay;
+	        refresh();
+	      });
+	    }, 1000);
+	  }
 
+	  panes() {
+	    if (!this.hasRelay) {
+	      return [];
+	    }
+	    return [(node, id) => React.createElement(
+	      StoreWrapper,
+	      { store: this.relayStore, key: 'relay' },
+	      () => React.createElement(ElementPanel, { node: node, id: id })
+	    )];
+	  }
 
+	  teardown() {}
 
+	  tabs() {
+	    if (!this.hasRelay) {
+	      return null;
+	    }
+	    return {
+	      Relay: () => React.createElement(
+	        StoreWrapper,
+	        { store: this.relayStore },
+	        () => React.createElement(QueriesTab, null)
+	      )
+	    };
+	  }
+	}
 
-
-
-
-
-
-	var React=__webpack_require__(3);
-	var provideStore=__webpack_require__(182);
-
-	var RelayStore=__webpack_require__(194);
-	var QueriesTab=__webpack_require__(189);
-
-	var ElementPanel=__webpack_require__(188);
-
-	var StoreWrapper=provideStore('relayStore');
-
-	class RelayPlugin{
-
-
-
-
-
-	constructor(store,bridge,refresh){
-	this.bridge=bridge;
-	this.store=store;
-	this.hasRelay=false;
-	this.relayStore=new RelayStore(bridge,store);
-
-
-
-	setTimeout(() => {
-	bridge.call('relay:check',[],hasRelay => {
-	this.hasRelay=hasRelay;
-	refresh();});},
-
-	1000);}
-
-
-	panes(){
-	if(!this.hasRelay){
-	return [];}
-
-	return [
-	(node,id) => 
-	React.createElement(StoreWrapper,{store:this.relayStore,key:'relay'},
-	() => React.createElement(ElementPanel,{node:node,id:id}))];}
-
-
-
-
-
-	teardown(){}
-
-
-	tabs(){
-	if(!this.hasRelay){
-	return null;}
-
-	return {
-	Relay:() => 
-	React.createElement(StoreWrapper,{store:this.relayStore},
-	() => React.createElement(QueriesTab,null))};}}
-
-
-
-
-
-
-
-
-
-
-
-	module.exports=RelayPlugin;
+	// RelayStore: () => (
+	//   <StoreWrapper store={this.relayStore}>
+	//     {() => <StoreTab />}
+	//   </StoreWrapper>
+	// ),
+	module.exports = RelayPlugin;
 
 /***/ },
 /* 194 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';var _extends2=__webpack_require__(21);var _extends3=_interopRequireDefault(_extends2);function _interopRequireDefault(obj){return obj&&obj.__esModule?obj:{default:obj};}
-
-
-
-
-
-
-
-
-
-
-
-
-
-	var {EventEmitter}=__webpack_require__(121);
-	var {OrderedMap,Map}=__webpack_require__(76);
-	var assign=__webpack_require__(2);
-	var consts=__webpack_require__(20);
-	var invariant=__webpack_require__(41);
-
-	function getDataIDs(obj){
-	var collector=[];
-	getDataIDsInternal(obj,collector);
-	return collector;}
-
-	function getDataIDsInternal(obj,collector){
-	for(var name in obj){
-	if(name==='id'&&typeof obj[name]==='string'){
-	collector.push(obj[name]);}else 
-	if(typeof obj[name]==='object'){
-	getDataIDs(obj[name],collector);}}}
-
-
-
-
-	class Store extends EventEmitter{
-
-
-
-
-
-
-
-
-
-
-
-
-
-	constructor(bridge,mainStore){
-	super();
-	this.storeData=null;
-	this.storeDateSubscriptionCount=0;
-	this.selectedQuery=null;
-	this.queries=new OrderedMap();
-	this._bridge=bridge;
-	this._mainStore=mainStore;
-
-	bridge.on('relay:store',data => {
-	this.storeData=data;
-	this.emit('storeData');});
-
-	this.queriesByDataID={};
-
-	bridge.on('relay:pending',pendingQueries => {
-	pendingQueries.forEach(pendingQuery => {
-	this.queries=this.queries.set(
-	pendingQuery.id,
-	new Map((0,_extends3.default)({},
-	pendingQuery,{
-	status:'pending',
-	text:pendingQuery.text.join('')})));
-
-
-	this.emit('queries');
-	this.emit(pendingQuery.id);
-	getDataIDs(pendingQuery.variables).forEach(id => {
-	if(!this.queriesByDataID[id]){
-	this.queriesByDataID[id]=[pendingQuery.id];}else 
-	{
-	this.queriesByDataID[id].push(pendingQuery.id);}});});});
-
-
-
-
-	bridge.on('relay:success',({id,response,end}) => {
-	this.queries=this.queries.mergeIn([id],new Map({status:'success',response,end}));
-	this.emit('queries');
-	this.emit(id);});
-
-	bridge.on('relay:failure',({id,error,end}) => {
-	this.queries=this.queries.mergeIn([id],new Map({status:'failure',error,end}));
-	this.emit('queries');
-	this.emit(id);});
-
-	this.dataIDsToNodes={};
-	this.nodesToDataIDs={};
-
-	bridge.on('mount',data => {
-	if(!data.props||!data.props.relay&&data.name.indexOf('Relay(')!==0){
-	return;}
-
-	this.nodesToDataIDs[data.id]=new window.Set();
-	for(var name in data.props){
-	var id=data.props[name]&&data.props[name].__dataID__;
-	if(!id){
-	continue;}
-
-	if(!this.dataIDsToNodes[id]){
-	this.dataIDsToNodes[id]=new window.Set();}
-
-	this.dataIDsToNodes[id].add(data.id);
-	this.nodesToDataIDs[data.id].add(id);}});
-
-
-	bridge.on('update',data => {
-	if(!data.props||!this.nodesToDataIDs[data.id]){
-	return;}
-
-	var newIds=new window.Set();
-	for(var name in data.props){
-	var id=data.props[name]&&data.props[name].__dataID__;
-	if(!id){
-	continue;}
-
-	newIds.add(id);
-	if(this.nodesToDataIDs[data.id].has(id)){
-	continue;}
-
-	if(!this.dataIDsToNodes[id]){
-	this.dataIDsToNodes[id]=new window.Set();}
-
-	this.dataIDsToNodes[id].add(data.id);}
-
-
-
-	for(var item of this.nodesToDataIDs[data.id]){
-	if(!newIds.has(item)){
-	this.dataIDsToNodes[item].delete(data.id);}}
-
-
-	this.nodesToDataIDs[id]=newIds;});
-
-	bridge.on('unmount',id => {
-	if(!this.nodesToDataIDs[id]){
-	return;}
-
-	for(var item of this.nodesToDataIDs[id]){
-	this.dataIDsToNodes[item].delete(id);}
-
-	this.nodesToDataIDs[id]=null;});}
-
-
-
-	jumpToDataID(dataID){
-	this._mainStore.setSelectedTab('RelayStore');
-	this.selectedDataNode=dataID;
-	this.emit('selectedDataNode');}
-
-
-	jumpToQuery(queryID){
-	this._mainStore.setSelectedTab('Relay');
-	this.selectedQuery=queryID;
-	this.emit('selectedQuery');
-	this.emit('queries');}
-
-
-	inspect(id,path,cb){
-	this._bridge.inspect(id,path,value => {
-	var base;
-	if(id==='relay:store'){
-	invariant(
-	this.storeData,
-	'RelayStore.inspect: this.storeData should be defined.');
-
-	base=this.storeData.nodes;}else 
-	{
-	base=this.queries.get(id).get(path[0]);}
-
-	var inspected=path.slice(1).reduce((obj,attr) => obj?obj[attr]:null,base);
-	if(inspected){
-	assign(inspected,value);
-	inspected[consts.inspected]=true;}
-
-	cb();});}
-
-
-
-	on(evt,fn){
-	if(evt==='storeData'){
-	this.storeDateSubscriptionCount++;
-	if(this.storeDateSubscriptionCount===1){
-	this._bridge.call('relay:store:enable',[],() => {});}}
-
-
-	this.addListener(evt,fn);}
-
-
-	off(evt,fn){
-	if(evt==='storeData'){
-	this.storeDateSubscriptionCount--;
-	if(this.storeDateSubscriptionCount===0){
-	this._bridge.call('relay:store:disable',[],() => {});}}
-
-
-	this.removeListener(evt,fn);}
-
-
-	selectQuery(id){
-	this.selectedQuery=id;
-	this.emit('selectedQuery');}}
-
-
-
-	module.exports=Store;
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
+	'use strict';
+
+	var _extends2 = __webpack_require__(21);
+
+	var _extends3 = _interopRequireDefault(_extends2);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	var { EventEmitter } = __webpack_require__(121);
+	var { OrderedMap, Map } = __webpack_require__(76);
+	var assign = __webpack_require__(2);
+	var consts = __webpack_require__(20);
+	var invariant = __webpack_require__(41);
+
+	function getDataIDs(obj) {
+	  var collector = [];
+	  getDataIDsInternal(obj, collector);
+	  return collector;
+	}
+	function getDataIDsInternal(obj, collector) {
+	  for (var name in obj) {
+	    if (name === 'id' && typeof obj[name] === 'string') {
+	      collector.push(obj[name]);
+	    } else if (typeof obj[name] === 'object') {
+	      getDataIDs(obj[name], collector);
+	    }
+	  }
+	}
+
+	class Store extends EventEmitter {
+
+	  constructor(bridge, mainStore) {
+	    super();
+	    this.storeData = null;
+	    this.storeDateSubscriptionCount = 0;
+	    this.selectedQuery = null;
+	    this.queries = new OrderedMap();
+	    this._bridge = bridge;
+	    this._mainStore = mainStore;
+	    // initial population of the store
+	    bridge.on('relay:store', data => {
+	      this.storeData = data;
+	      this.emit('storeData');
+	    });
+	    this.queriesByDataID = {};
+	    // queries and mutations
+	    bridge.on('relay:pending', pendingQueries => {
+	      pendingQueries.forEach(pendingQuery => {
+	        this.queries = this.queries.set(pendingQuery.id, new Map((0, _extends3.default)({}, pendingQuery, {
+	          status: 'pending',
+	          text: pendingQuery.text.join('')
+	        })));
+	        this.emit('queries');
+	        this.emit(pendingQuery.id);
+	        getDataIDs(pendingQuery.variables).forEach(id => {
+	          if (!this.queriesByDataID[id]) {
+	            this.queriesByDataID[id] = [pendingQuery.id];
+	          } else {
+	            this.queriesByDataID[id].push(pendingQuery.id);
+	          }
+	        });
+	      });
+	    });
+	    bridge.on('relay:success', ({ id, response, end }) => {
+	      this.queries = this.queries.mergeIn([id], new Map({ status: 'success', response, end }));
+	      this.emit('queries');
+	      this.emit(id);
+	    });
+	    bridge.on('relay:failure', ({ id, error, end }) => {
+	      this.queries = this.queries.mergeIn([id], new Map({ status: 'failure', error, end }));
+	      this.emit('queries');
+	      this.emit(id);
+	    });
+	    this.dataIDsToNodes = {};
+	    this.nodesToDataIDs = {};
+	    // track nodes
+	    bridge.on('mount', data => {
+	      if (!data.props || !data.props.relay && data.name.indexOf('Relay(') !== 0) {
+	        return; // not a relay child
+	      }
+	      this.nodesToDataIDs[data.id] = new window.Set();
+	      for (var name in data.props) {
+	        var id = data.props[name] && data.props[name].__dataID__;
+	        if (!id) {
+	          continue;
+	        }
+	        if (!this.dataIDsToNodes[id]) {
+	          this.dataIDsToNodes[id] = new window.Set();
+	        }
+	        this.dataIDsToNodes[id].add(data.id);
+	        this.nodesToDataIDs[data.id].add(id);
+	      }
+	    });
+	    bridge.on('update', data => {
+	      if (!data.props || !this.nodesToDataIDs[data.id]) {
+	        return;
+	      }
+	      var newIds = new window.Set();
+	      for (var name in data.props) {
+	        var id = data.props[name] && data.props[name].__dataID__;
+	        if (!id) {
+	          continue;
+	        }
+	        newIds.add(id);
+	        if (this.nodesToDataIDs[data.id].has(id)) {
+	          continue;
+	        }
+	        if (!this.dataIDsToNodes[id]) {
+	          this.dataIDsToNodes[id] = new window.Set();
+	        }
+	        this.dataIDsToNodes[id].add(data.id);
+	        // this.nodesToDataIDs[data.id].add(id);
+	      }
+
+	      for (var item of this.nodesToDataIDs[data.id]) {
+	        if (!newIds.has(item)) {
+	          this.dataIDsToNodes[item].delete(data.id);
+	        }
+	      }
+	      this.nodesToDataIDs[id] = newIds;
+	    });
+	    bridge.on('unmount', id => {
+	      if (!this.nodesToDataIDs[id]) {
+	        return;
+	      }
+	      for (var item of this.nodesToDataIDs[id]) {
+	        this.dataIDsToNodes[item].delete(id);
+	      }
+	      this.nodesToDataIDs[id] = null;
+	    });
+	  }
+
+	  jumpToDataID(dataID) {
+	    this._mainStore.setSelectedTab('RelayStore');
+	    this.selectedDataNode = dataID;
+	    this.emit('selectedDataNode');
+	  }
+
+	  jumpToQuery(queryID) {
+	    this._mainStore.setSelectedTab('Relay');
+	    this.selectedQuery = queryID;
+	    this.emit('selectedQuery');
+	    this.emit('queries');
+	  }
+
+	  inspect(id, path, cb) {
+	    this._bridge.inspect(id, path, value => {
+	      var base;
+	      if (id === 'relay:store') {
+	        invariant(this.storeData, 'RelayStore.inspect: this.storeData should be defined.');
+	        base = this.storeData.nodes;
+	      } else {
+	        base = this.queries.get(id).get(path[0]);
+	      }
+	      var inspected = path.slice(1).reduce((obj, attr) => obj ? obj[attr] : null, base);
+	      if (inspected) {
+	        assign(inspected, value);
+	        inspected[consts.inspected] = true;
+	      }
+	      cb();
+	    });
+	  }
+
+	  on(evt, fn) {
+	    if (evt === 'storeData') {
+	      this.storeDateSubscriptionCount++;
+	      if (this.storeDateSubscriptionCount === 1) {
+	        this._bridge.call('relay:store:enable', [], () => {});
+	      }
+	    }
+	    this.addListener(evt, fn);
+	  }
+
+	  off(evt, fn) {
+	    if (evt === 'storeData') {
+	      this.storeDateSubscriptionCount--;
+	      if (this.storeDateSubscriptionCount === 0) {
+	        this._bridge.call('relay:store:disable', [], () => {});
+	      }
+	    }
+	    this.removeListener(evt, fn);
+	  }
+
+	  selectQuery(id) {
+	    this.selectedQuery = id;
+	    this.emit('selectedQuery');
+	  }
+	}
+
+	module.exports = Store;
 
 /***/ },
 /* 195 */,
 /* 196 */
 /***/ function(module, exports) {
 
+	/**
+	 * Copyright (c) 2015-present, Facebook, Inc.
+	 * All rights reserved.
+	 *
+	 * This source code is licensed under the BSD-style license found in the
+	 * LICENSE file in the root directory of this source tree. An additional grant
+	 * of patent rights can be found in the PATENTS file in the same directory.
+	 *
+	 *
+	 */
 	'use strict';
 
+	function tidyGraphQL(input) {
+	  var indent = '';
 
+	  var lastWasNewline = false;
 
+	  var parenCount = 0;
+	  var line = '';
+	  var head = [];
+	  var stack = [head];
 
+	  for (var i = 0; i < input.length; i++) {
+	    var c = input.charAt(i);
+	    if (c == '(') {
+	      parenCount++;
+	    } else if (c == ')') {
+	      parenCount--;
+	    }
 
+	    if (c == '{') {
+	      indent += '  ';
+	      lastWasNewline = true;
 
+	      head.push(line + '{');
+	      line = indent;
+	      head = [];
+	      stack.push(head);
+	    } else if (c == ',' && parenCount == 0) {
+	      head.push(line);
 
+	      lastWasNewline = true;
+	      line = indent;
+	    } else if (c == '}') {
+	      indent = indent.substr(2);
 
+	      head.push(line.replace(/ +$/, ''));
+	      head.sort();
+	      line = head.join(',\n');
+	      stack.pop();
+	      head = stack[stack.length - 1];
+	      line = head.pop() + '\n' + line + '\n' + indent + '}';
+	    } else if (c == ' ' && lastWasNewline) {
+	      continue;
+	    } else if (c != ' ' && i + 1 < input.length && input.charAt(i + 1) == '{') {
+	      line += c + ' ';
+	    } else {
+	      lastWasNewline = false;
+	      line += c;
+	    }
+	  }
 
+	  // TODO(jkassens) hack to format queries with fragments.
+	  return line.replace(/^} /gm, '}\n\n');
+	}
 
-
-	function tidyGraphQL(input){
-	var indent='';
-
-	var lastWasNewline=false;
-
-	var parenCount=0;
-	var line='';
-	var head=[];
-	var stack=[head];
-
-	for(var i=0;i<input.length;i++){
-	var c=input.charAt(i);
-	if(c=='('){
-	parenCount++;}else 
-	if(c==')'){
-	parenCount--;}
-
-
-	if(c=='{'){
-	indent+='  ';
-	lastWasNewline=true;
-
-	head.push(line+'{');
-	line=indent;
-	head=[];
-	stack.push(head);}else 
-	if(c==','&&parenCount==0){
-	head.push(line);
-
-	lastWasNewline=true;
-	line=indent;}else 
-	if(c=='}'){
-	indent=indent.substr(2);
-
-	head.push(line.replace(/ +$/,''));
-	head.sort();
-	line=head.join(',\n');
-	stack.pop();
-	head=stack[stack.length-1];
-	line=head.pop()+'\n'+line+'\n'+indent+'}';}else 
-	if(c==' '&&lastWasNewline){
-	continue;}else 
-	if(c!=' '&&i+1<input.length&&input.charAt(i+1)=='{'){
-	line+=c+' ';}else 
-	{
-	lastWasNewline=false;
-	line+=c;}}
-
-
-
-
-	return line.replace(/^} /gm,'}\n\n');}
-
-
-	module.exports=tidyGraphQL;
+	module.exports = tidyGraphQL;
 
 /***/ },
 /* 197 */
