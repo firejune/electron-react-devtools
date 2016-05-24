@@ -68,22 +68,22 @@ var config: Props = {
     });
   },
   getURL(src, done) {
-    var code = 'global.__dirname';
+    var code = 'global.__REACT_DEVTOOLS_GLOBAL_HOOK__.path';
     chrome.devtools.inspectedWindow.eval(code, (res, err) => {
       if (err) {
         console.error('Failed to inspect source', err);
       }
-      done(res + '/node_modules/react-devtron/' + src);
+      done(res + '/' + src);
     });
   },
   inject(done) {
     this.getURL('build/backend.js', (source) => {
-	    _inject(source, function () {
+	    inject(source, () => {
 	      var disconnected = false;
         var wall = {
           listen(fn) {
             setInterval(function() {
-              chrome.devtools.inspectedWindow.eval('global.__react.receives()', function(res, err) {
+              chrome.devtools.inspectedWindow.eval('global.__REACT_DEVTOOLS_GLOBAL_HOOK__.receiver()', function(res, err) {
                 if (res && res.length) {
                   fn(res[0].data.payload);
                 }
@@ -102,7 +102,7 @@ var config: Props = {
   	          }
   	        });
 
-	          var code = ';\nglobal.__react.emit("message", ' + packet + ');';
+	          var code = ';\nglobal.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.emit("message", ' + packet + ');';
             chrome.devtools.inspectedWindow.eval(code, function (res, err) {
       	      if (err) {
       	        return console.error('Failed to call function', err);
@@ -117,7 +117,7 @@ var config: Props = {
 
     	  done(wall, () => {
           // TODO disconnect
-          port.disconnect();
+          // port.disconnect();
         });
       });
     });

@@ -25,21 +25,20 @@ setInterval(function() {
 
 var {EventEmitter} = require('events');
 var sendQueue = [];
-global.__react = new EventEmitter;
-global.__react.appPath = __dirname;
-global.__react.receives = function() {
+global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender = new EventEmitter;
+global.__REACT_DEVTOOLS_GLOBAL_HOOK__.receiver = function() {
   return sendQueue.splice(0);
 };
 
-__react.addListener('message', welcome);
+global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', welcome);
 
 function welcome(evt) {
-	console.debug('__react.receive.welcome', evt.data);
+	// console.debug('background.welcome', evt.data);
   if (evt.data.source !== 'react-devtools-content-script') {
     return;
   }
 
-  __react.removeListener('message', welcome);
+  global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.removeListener('message', welcome);
   setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
 }
 
@@ -49,17 +48,17 @@ function setup(hook) {
   var wall = {
     listen: function listen(fn) {
       var listener = function listener(evt) {
-	      console.debug('__react.receive.listener', evt);
+	      // console.debug('background.receiver', evt);
         if (evt.data.source !== 'react-devtools-content-script' || !evt.data.payload) {
           return;
         }
         fn(evt.data.payload);
       };
       listeners.push(listener);
-      __react.addListener('message', listener);
+      global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', listener);
     },
     send: function send(data) {
-	    console.debug('__react.send', data);
+	    // console.debug('background.sender', data);
 	    sendQueue.push({
   	    data: {
 	        source: 'react-devtools-bridge',
