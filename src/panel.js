@@ -93,9 +93,14 @@ var config: Props = {
       };
 
   	  done(wall, () => {
-        // TODO disconnect
+        if (disconnected) {
+          return;
+        }
         ws.close();
       });
+    };
+    ws.onclose = function () {
+      disconnected = true;
     };
   }
 };
