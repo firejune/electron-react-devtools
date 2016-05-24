@@ -17,7 +17,6 @@ module.exports = {
   entry: {
     main: './src/main.js',
     background: './src/background.js',
-    inject: './src/GlobalHook.js',
     contentScript: './src/contentScript.js',
     panel: './src/panel.js',
   },
@@ -25,7 +24,6 @@ module.exports = {
     path: './build',
     filename: '[name].js',
   },
-
   module: {
     loaders: [{
       test: /\.js$/,
@@ -40,8 +38,7 @@ module.exports = {
         plugins: [
           'transform-es2015-modules-commonjs',
           'transform-es2015-function-name',
-          'transform-remove-console',
-          'transform-runtime'
+          'transform-remove-console'
         ]
       }
     }],

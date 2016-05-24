@@ -15,8 +15,12 @@ const __DEV__ = process.env.NODE_ENV !== 'production';
 module.exports = {
   devtool: __DEV__ ? 'cheap-module-eval-source-map' : false,
   entry: {
+    inject: './src/GlobalHook.js',
     backend: './src/backend.js',
   },
+
+  target: 'node',
+
   output: {
     path: './build',
     filename: '[name].js',
@@ -36,8 +40,7 @@ module.exports = {
         plugins: [
           'transform-es2015-modules-commonjs',
           'transform-es2015-function-name',
-          'transform-remove-console',
-          'transform-runtime'
+          'transform-remove-console'
         ]
       }
     }],
