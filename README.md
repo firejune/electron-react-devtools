@@ -5,6 +5,8 @@ Unfortunately, "React DevTools" not working with Electron... Because not impleme
 ## Installing
 
 ```sh
+npm install --save-dev electron-react-devtools
+or
 npm install --save-dev firejune/electron-react-devtools
 ```
 
@@ -20,7 +22,7 @@ You should then see a `React` tab added.
 ## To hack on the plugin
 
 - run `npm install`
-- run `webpack --config webpack.backend.js` in this directory
+- run `npm run pack` in this directory
 - run `webpack` or `webpack --watch` in this directory
 - Go to `chrome://extensions`, check "developer mode", and click "Load
   unpacked extension", and select this directory
