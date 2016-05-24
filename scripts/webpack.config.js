@@ -33,9 +33,6 @@ module.exports = {
       exclude: /node_modules/,
       query: {
         babelrc: false,
-        retainLines: true,
-        compact: true,
-        comments: false,
         presets: [
           'react',
           'stage-0'
