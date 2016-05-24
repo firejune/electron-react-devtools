@@ -1,6 +1,4 @@
 .DS_Store
-_devtron/
-_electron/
 build/react-devtools-chrome.zip
 node_modules/
 npm-debug.log
