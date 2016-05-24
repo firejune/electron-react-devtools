@@ -9,7 +9,8 @@
  */
 'use strict';
 
-var __DEV__ = process.env.NODE_ENV !== 'production';
+const webpack = require('webpack');
+const __DEV__ = process.env.NODE_ENV !== 'production';
 
 module.exports = {
   devtool: __DEV__ ? 'cheap-module-eval-source-map' : false,
@@ -30,6 +31,29 @@ module.exports = {
       test: /\.js$/,
       loader:  'babel',
       exclude: /node_modules/,
+      query: {
+        babelrc: false,
+        retainLines: true,
+        compact: true,
+        comments: false,
+        presets: [
+          'react',
+          'stage-0'
+        ],
+        plugins: [
+          'transform-es2015-modules-commonjs',
+          'transform-es2015-function-name',
+          'transform-remove-console',
+          'transform-runtime'
+        ]
+      }
     }],
   },
+
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env': {NODE_ENV: '"production"'}
+    }),
+    new webpack.optimize.OccurenceOrderPlugin()
+  ]
 };
