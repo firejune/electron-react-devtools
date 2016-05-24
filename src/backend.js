@@ -23,48 +23,61 @@ setInterval(function() {
   // this is needed to force refresh on react native
 }, 100);
 
-var {EventEmitter} = require('events');
-var sendQueue = [];
-global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender = new EventEmitter;
-global.__REACT_DEVTOOLS_GLOBAL_HOOK__.receiver = function() {
-  return sendQueue.splice(0);
-};
 
-global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', welcome);
-
-function welcome(evt) {
-	// console.debug('background.welcome', evt.data);
-  if (evt.data.source !== 'react-devtools-content-script') {
+var ws = require('ws');
+var server = new ws.Server({ port: 8097 });
+var connected = false;
+server.on('connection', function(socket) {
+  if (connected) {
+    console.warn('only one connection allowed at a time');
+    socket.close();
     return;
   }
+  connected = true;
+  socket.onerror = function (err) {
+    connected = false;
+    console.log('Error with websocket connection', err);
+  };
 
-  global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.removeListener('message', welcome);
-  setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
-}
+  socket.onclose = function () {
+    connected = false;
+    console.log('Connection to RN closed');
+  };
 
-function setup(hook) {
+  socket.onmessage = function (evt) {
+    setup(socket);
+  };
+});
+
+server.on('error', function (e) {
+  console.error('Failed to start the DevTools server', e);
+});
+
+function setup(socket) {
+  var hook = window.__REACT_DEVTOOLS_GLOBAL_HOOK__;
   var listeners = [];
-
   var wall = {
     listen: function listen(fn) {
       var listener = function listener(evt) {
-	      // console.debug('background.receiver', evt);
-        if (evt.data.source !== 'react-devtools-content-script' || !evt.data.payload) {
+	      var data = JSON.parse(evt.data);
+        // console.debug('background.receive', data);
+        if (data.source !== 'react-devtools-content-script' || !data.payload) {
           return;
         }
-        fn(evt.data.payload);
+        fn(data.payload);
       };
       listeners.push(listener);
-      global.__REACT_DEVTOOLS_GLOBAL_HOOK__.sender.addListener('message', listener);
+      socket.onmessage = listener;
     },
     send: function send(data) {
 	    // console.debug('background.sender', data);
-	    sendQueue.push({
-  	    data: {
-	        source: 'react-devtools-bridge',
-	        payload: data
-	      }
-	    });
+      socket.send(JSON.stringify({
+        source: 'react-devtools-bridge',
+        payload: data
+      }));
+    },
+    disconnect: function disconnect() {
+      socket.close();
     }
   };
 
