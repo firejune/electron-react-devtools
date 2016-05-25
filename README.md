@@ -1,6 +1,8 @@
 # React DevTools Extension for Electron
 
-Unfortunately, "React DevTools Extension" is not working with Electron. Because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix the source of "React DevTools" for Electron.
+Unfortunately, [React DevTools](https://github.com/facebook/react-devtools) is not working with [Electron](http://electron.atom.io/). Because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix the source of "React DevTools" for Electron.
+
+![](/devtools-full.gif)
 
 ## Installing
 
