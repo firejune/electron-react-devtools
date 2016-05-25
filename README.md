@@ -22,7 +22,7 @@ You should then see a `React` tab added.
 ## To hack on the plugin
 
 - run `npm install`
-- run `npm run pack` in this directory
+- run `npm run build` in this directory
 - run `webpack` or `webpack --watch` in this directory
 - Go to `chrome://extensions`, check "developer mode", and click "Load
   unpacked extension", and select this directory
