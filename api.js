@@ -11,6 +11,7 @@ exports.install = () => {
   }
 
   console.log(`Installing React DevTools from ${__dirname}`)
+  exports.inject();
   return electron.remote.BrowserWindow.addDevToolsExtension(__dirname)
 }
 
