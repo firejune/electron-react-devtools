@@ -14,16 +14,19 @@ const __DEV__ = process.env.NODE_ENV !== 'production';
 
 module.exports = {
   devtool: __DEV__ ? 'cheap-module-eval-source-map' : false,
+
   entry: {
     main: './src/main.js',
     background: './src/background.js',
     contentScript: './src/contentScript.js',
     panel: './src/panel.js',
   },
+
   output: {
     path: './build',
     filename: '[name].js',
   },
+
   module: {
     loaders: [{
       test: /\.js$/,
@@ -32,13 +35,13 @@ module.exports = {
       query: {
         babelrc: false,
         presets: [
+          'es2015',
           'react',
           'stage-0'
         ],
         plugins: [
-          'transform-es2015-modules-commonjs',
-          'transform-es2015-function-name',
-          'transform-remove-console'
+          'transform-remove-console',
+          'transform-runtime'
         ]
       }
     }],
