@@ -1,6 +1,9 @@
 # React DevTools Extension for Electron
 
-Unfortunately, [React DevTools](https://github.com/facebook/react-devtools) is not working with [Electron](http://electron.atom.io/). Because not implemented `chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix the source of "React DevTools" for Electron.
+Unfortunately, [React DevTools](https://github.com/facebook/react-devtools)
+is not working with [Electron](http://electron.atom.io/). Because not implemented
+`chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix
+the source of "React DevTools" for Electron.
 
 ![](/devtools-full.gif)
 
@@ -11,6 +14,18 @@ npm install --save-dev electron-react-devtools
 or
 npm install --save-dev firejune/electron-react-devtools
 ```
+
+Then add the React's inject script in to `main.html`(or entry root js) before loading your app
+source running on renderer process:
+```html
+<script>
+  require('electron-react-devtools').inject()
+  require('./src')
+</script>
+```
+
+Check should not visible React DevTools message('Download the React DevTools
+and ...') in `Console` tab.
 
 Then execute the following from the Console tab of your running Electron app's
 developer tools:
