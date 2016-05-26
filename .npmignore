@@ -1,6 +1,7 @@
 .babelrc
 .eslintignore
 .eslintrc
+.flowconfig
 .npmignore
 /build/react-devtools-chrome.zip
 /scripts
