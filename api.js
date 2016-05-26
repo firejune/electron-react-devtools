@@ -1,7 +1,9 @@
 const electron = require('electron')
 
-require('./build/inject');
-require('./build/backend');
+exports.inject = () => {
+  require('./build/inject');
+  require('./build/backend');
+}
 
 exports.install = () => {
   if (!electron.remote) {
