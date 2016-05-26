@@ -1,13 +1,17 @@
 {
   "name": "electron-react-devtools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React DevTools Extension for Electron",
   "main": "./api.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/firejune/electron-react-devtools.git"
   },
-  "author": "Joon Kyoung",
+  "author": {
+    "name": "Joon Kyoung",
+    "email": "firejune@gmail.com",
+    "url": "http://firejune.com"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/firejune/electron-react-devtools/issues"
@@ -22,6 +26,7 @@
   ],
   "homepage": "https://github.com/electron/electron-react-devtools#readme",
   "dependencies": {
+    "portfinder": "^1.0.3",
     "ws": "*"
   },
   "devDependencies": {
@@ -29,9 +34,9 @@
     "babel-eslint": "6.0.4",
     "babel-jest": "12.1.0",
     "babel-loader": "6.2.4",
-    "babel-plugin-transform-es2015-function-name": "^6.9.0",
-    "babel-plugin-transform-es2015-modules-commonjs": "^6.8.0",
     "babel-plugin-transform-remove-console": "^6.8.0",
+    "babel-plugin-transform-runtime": "^6.9.0",
+    "babel-preset-es2015": "^6.9.0",
     "babel-preset-react": "6.5.0",
     "babel-preset-stage-0": "6.5.0",
     "classnames": "2.2.5",
