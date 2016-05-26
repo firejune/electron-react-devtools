@@ -60,15 +60,10 @@
 	// Inject a `__REACT_DEVTOOLS_GLOBAL_HOOK__` global so that React can detect that the
 	// devtools are installed (and skip its suggestion to install the devtools).
 
-	var installGlobalHook = __webpack_require__(30);
-	var installRelayHook = __webpack_require__(40);
+	var installGlobalHook = __webpack_require__(28);
+	var installRelayHook = __webpack_require__(38);
 
-	var saveNativeValues = `
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeObjectCreate = Object.create;
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeMap = Map;
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeWeakMap = WeakMap;
-	window.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeSet = Set;
-	`;
+	var saveNativeValues = '\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeObjectCreate = Object.create;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeMap = Map;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeWeakMap = WeakMap;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeSet = Set;\n';
 
 	var js = ';(' + installGlobalHook.toString() + '(window))' + ';(' + installRelayHook.toString() + '(window))' + saveNativeValues;
 
@@ -81,7 +76,7 @@
 
 /***/ },
 
-/***/ 30:
+/***/ 28:
 /***/ function(module, exports) {
 
 	/**
@@ -111,12 +106,16 @@
 	      inject: function inject(renderer) {
 	        var id = Math.random().toString(16).slice(2);
 	        this._renderers[id] = renderer;
-	        this.emit('renderer', { id, renderer });
+	        this.emit('renderer', { id: id, renderer: renderer });
 	      },
 	      _listeners: {},
 	      sub: function sub(evt, fn) {
+	        var _this = this;
+
 	        this.on(evt, fn);
-	        return () => this.off(evt, fn);
+	        return function () {
+	          return _this.off(evt, fn);
+	        };
 	      },
 	      on: function on(evt, fn) {
 	        if (!this._listeners[evt]) {
@@ -138,7 +137,9 @@
 	      },
 	      emit: function emit(evt, data) {
 	        if (this._listeners[evt]) {
-	          this._listeners[evt].map(fn => fn(data));
+	          this._listeners[evt].map(function (fn) {
+	            return fn(data);
+	          });
 	        }
 	      }
 	    }
@@ -149,7 +150,7 @@
 
 /***/ },
 
-/***/ 40:
+/***/ 38:
 /***/ function(module, exports) {
 
 	/**
@@ -170,7 +171,7 @@
 	 */
 
 	function installRelayHook(window) {
-	  const TEXT_CHUNK_LENGTH = 500;
+	  var TEXT_CHUNK_LENGTH = 500;
 
 	  var hook = window.__REACT_DEVTOOLS_GLOBAL_HOOK__;
 	  if (!hook) {
@@ -189,7 +190,7 @@
 	  var _eventQueue = [];
 	  var _listener = null;
 	  function emit(name, data) {
-	    _eventQueue.push({ name, data });
+	    _eventQueue.push({ name: name, data: data });
 	    if (_listener) {
 	      _listener(name, data);
 	    }
@@ -200,32 +201,35 @@
 	      throw new Error('Relay Devtools: Called only call setRequestListener once.');
 	    }
 	    _listener = listener;
-	    _eventQueue.forEach(({ name, data }) => {
+	    _eventQueue.forEach(function (_ref) {
+	      var name = _ref.name;
+	      var data = _ref.data;
+
 	      listener(name, data);
 	    });
 
-	    return () => {
+	    return function () {
 	      _listener = null;
 	    };
 	  }
 
 	  function recordRequest(type, start, request, requestNumber) {
 	    var id = Math.random().toString(16).substr(2);
-	    request.then(response => {
+	    request.then(function (response) {
 	      emit('relay:success', {
 	        id: id,
 	        end: performance.now(),
 	        response: response.response
 	      });
-	    }, error => {
+	    }, function (error) {
 	      emit('relay:failure', {
 	        id: id,
 	        end: performance.now(),
 	        error: error
 	      });
 	    });
-	    const textChunks = [];
-	    let text = request.getQueryString();
+	    var textChunks = [];
+	    var text = request.getQueryString();
 	    while (text.length > 0) {
 	      textChunks.push(text.substr(0, TEXT_CHUNK_LENGTH));
 	      text = text.substr(TEXT_CHUNK_LENGTH);
@@ -241,20 +245,22 @@
 	    };
 	  }
 
-	  let requestNumber = 0;
+	  var requestNumber = 0;
 
 	  function instrumentRelayRequests(relayInternals) {
 	    var NetworkLayer = relayInternals.NetworkLayer;
 
-	    decorate(NetworkLayer, 'sendMutation', mutation => {
+	    decorate(NetworkLayer, 'sendMutation', function (mutation) {
 	      requestNumber++;
 	      emit('relay:pending', [recordRequest('mutation', performance.now(), mutation, requestNumber)]);
 	    });
 
-	    decorate(NetworkLayer, 'sendQueries', queries => {
+	    decorate(NetworkLayer, 'sendQueries', function (queries) {
 	      requestNumber++;
-	      const start = performance.now();
-	      emit('relay:pending', queries.map(query => recordRequest('query', start, query, requestNumber)));
+	      var start = performance.now();
+	      emit('relay:pending', queries.map(function (query) {
+	        return recordRequest('query', start, query, requestNumber);
+	      }));
 	    });
 
 	    var instrumented = {};

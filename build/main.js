@@ -64,9 +64,7 @@
 	  if (panelCreated) {
 	    return;
 	  }
-	  chrome.devtools.inspectedWindow.eval(`!!(
-	    Object.keys(window.__REACT_DEVTOOLS_GLOBAL_HOOK__._renderers).length || window.React
-	  )`, function (pageHasReact, err) {
+	  chrome.devtools.inspectedWindow.eval('!!(\n    Object.keys(window.__REACT_DEVTOOLS_GLOBAL_HOOK__._renderers).length || window.React\n  )', function (pageHasReact, err) {
 	    if (!pageHasReact || panelCreated) {
 	      return;
 	    }
