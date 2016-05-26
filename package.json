@@ -27,6 +27,7 @@
   "homepage": "https://github.com/electron/electron-react-devtools#readme",
   "dependencies": {
     "portfinder": "^1.0.3",
+    "immutable": "3.8.1",
     "ws": "*"
   },
   "devDependencies": {
@@ -46,7 +47,6 @@
     "fbjs": "0.8.2",
     "fbjs-scripts": "0.7.0",
     "flow-bin": "0.23.0",
-    "immutable": "3.8.1",
     "jest-cli": "12.1.0",
     "json-loader": "0.5.4",
     "node-libs-browser": "1.0.0",
