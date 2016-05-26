@@ -68,8 +68,7 @@ module.exports = {
           'stage-0'
         ],
         plugins: [
-          'transform-remove-console',
-          'transform-runtime'
+          'transform-remove-console'
         ]
       }
     }],
