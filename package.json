@@ -1,6 +1,6 @@
 {
   "name": "electron-react-devtools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "React DevTools Extension for Electron",
   "main": "./api.js",
   "repository": {
@@ -26,9 +26,10 @@
   ],
   "homepage": "https://github.com/electron/electron-react-devtools#readme",
   "dependencies": {
-    "portfinder": "^1.0.3",
+    "babel-runtime": "^6.9.0",
     "immutable": "3.8.1",
-    "ws": "*"
+    "portfinder": "^1.0.3",
+    "ws": "^1.1.0"
   },
   "devDependencies": {
     "babel-core": "6.9.0",
