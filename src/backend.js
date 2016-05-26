@@ -10,6 +10,7 @@
  */
 'use strict';
 
+var portfinder = require('portfinder');
 var Agent = require('./agent/Agent');
 var BananaSlugBackendManager = require('./plugins/BananaSlug/BananaSlugBackendManager');
 var Bridge = require('./agent/Bridge');
@@ -24,33 +25,40 @@ setInterval(function() {
 }, 100);
 
 
-var ws = require('ws');
-var server = new ws.Server({ port: 8097 });
-var connected = false;
-server.on('connection', function(socket) {
-  if (connected) {
-    console.warn('only one connection allowed at a time');
-    socket.close();
-    return;
-  }
-  connected = true;
-  socket.onerror = function (err) {
-    connected = false;
-    console.log('Error with websocket connection', err);
-  };
+portfinder.getPort((err, port) => {
+  // `port` is guaranteed to be a free port
+  // in this scope.
 
-  socket.onclose = function () {
-    connected = false;
-    console.log('Connection to RN closed');
-  };
+  var ws = require('ws');
+  var server = new ws.Server({ port });
+  var connected = false;
+  server.on('connection', (socket) => {
+    if (connected) {
+      console.warn('only one connection allowed at a time');
+      socket.close();
+      return;
+    }
+    connected = true;
+    socket.onerror = (err) => {
+      connected = false;
+      console.log('Error with websocket connection', err);
+    };
 
-  socket.onmessage = function (evt) {
-    setup(socket);
-  };
-});
+    socket.onclose = () => {
+      connected = false;
+      console.log('Connection to RN closed');
+    };
 
-server.on('error', function (e) {
-  console.error('Failed to start the DevTools server', e);
+    socket.onmessage = (evt) => {
+      setup(socket);
+    };
+  });
+
+  server.on('error', function (e) {
+    console.error('Failed to start the DevTools server', e);
+  });
+
+  window.__REACT_DEVTOOLS_GLOBAL_HOOK__.prot = port;
 });
 
 function setup(socket) {

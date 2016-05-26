@@ -67,41 +67,51 @@ var config: Props = {
       }
     });
   },
+  getPort(done) {
+    chrome.devtools.inspectedWindow.eval('window.__REACT_DEVTOOLS_GLOBAL_HOOK__.prot', (port, err) => {
+      if (err) {
+        return console.error('Failed get server port', err);
+      }
+      done(port);
+    });
+  },
   inject(done) {
-    var disconnected = false;
-    var ws = new WebSocket('ws://localhost:8097');
-    ws.onopen = function() {
-      var wall = {
-        listen(fn) {
-          ws.onmessage = function (evt) {
-	          var data = JSON.parse(evt.data);
-            fn(data.payload);
-          };
-        },
-        send(data) {
+    this.getPort(port => {
+      var disconnected = false;
+      var ws = new WebSocket(`ws://localhost:${port}`);
+      ws.onopen = function() {
+        var wall = {
+          listen(fn) {
+            ws.onmessage = function (evt) {
+  	          var data = JSON.parse(evt.data);
+              fn(data.payload);
+            };
+          },
+          send(data) {
+            if (disconnected) {
+              return;
+            }
+
+            var data = JSON.stringify({
+  	          source: 'react-devtools-content-script',
+  	          payload: data
+            });
+
+            ws.send(data);
+          }
+        };
+
+    	  done(wall, () => {
           if (disconnected) {
             return;
           }
-
-          var data = JSON.stringify({
-	          source: 'react-devtools-content-script',
-	          payload: data
-          });
-
-          ws.send(data);
-        }
+          ws.close();
+        });
       };
-
-  	  done(wall, () => {
-        if (disconnected) {
-          return;
-        }
-        ws.close();
-      });
-    };
-    ws.onclose = function () {
-      disconnected = true;
-    };
+      ws.onclose = function () {
+        disconnected = true;
+      };
+    });
   }
 };
 
