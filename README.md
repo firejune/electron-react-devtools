@@ -19,7 +19,9 @@ Then add the React's inject script in to `main.html`(or entry root js) before lo
 source running on renderer process:
 ```html
 <script>
+  // in development.
   require('electron-react-devtools').inject()
+  // your app root running on renderer process.
   require('./src')
 </script>
 ```
