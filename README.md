@@ -15,18 +15,21 @@ or
 npm install --save-dev firejune/electron-react-devtools
 ```
 
-Then add the React's inject script in to `main.html`(or entry root js) before loading your app
+Then add the React's injection script to `main.html`(or entry root js) before loading your app
 source running on renderer process:
 ```html
 <script>
   // in development.
-  require('electron-react-devtools').inject()
+  if (process.env.NODE_ENV !== 'production') {
+    require('electron-react-devtools').inject()
+  }
+
   // your app root running on renderer process.
-  require('./src')
+  ...
 </script>
 ```
 
-Check should not visible React DevTools message('Download the React DevTools
+Should not visible React DevTools message('Download the React DevTools
 and ...') in `Console` tab.
 
 Then execute the following from the Console tab of your running Electron app's
