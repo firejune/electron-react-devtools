@@ -1,8 +1,8 @@
 const electron = require('electron')
 
 exports.inject = () => {
-  require('./build/inject');
-  require('./build/backend');
+  require('./build/inject')
+  require('./build/backend')
 }
 
 exports.install = () => {
