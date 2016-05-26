@@ -60,8 +60,8 @@
 	// Inject a `__REACT_DEVTOOLS_GLOBAL_HOOK__` global so that React can detect that the
 	// devtools are installed (and skip its suggestion to install the devtools).
 
-	var installGlobalHook = __webpack_require__(28);
-	var installRelayHook = __webpack_require__(38);
+	var installGlobalHook = __webpack_require__(17);
+	var installRelayHook = __webpack_require__(27);
 
 	var saveNativeValues = '\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeObjectCreate = Object.create;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeMap = Map;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeWeakMap = WeakMap;\nwindow.__REACT_DEVTOOLS_GLOBAL_HOOK__.nativeSet = Set;\n';
 
@@ -76,7 +76,7 @@
 
 /***/ },
 
-/***/ 28:
+/***/ 17:
 /***/ function(module, exports) {
 
 	/**
@@ -150,7 +150,7 @@
 
 /***/ },
 
-/***/ 38:
+/***/ 27:
 /***/ function(module, exports) {
 
 	/**
