@@ -46,8 +46,7 @@ module.exports = {
   target: 'node',
 
   entry: {
-    inject: './src/GlobalHook.js',
-    backend: './src/backend.js',
+    inject: './src/GlobalHook.js'
   },
 
   output: {
