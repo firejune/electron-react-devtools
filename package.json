@@ -1,6 +1,6 @@
 {
   "name": "electron-react-devtools",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "React DevTools Extension for Electron",
   "main": "./api.js",
   "repository": {
