@@ -3,7 +3,7 @@ const electron = require('electron')
 // load injection scripts menualy
 exports.inject = () => {
   if (global.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined) {
-    return console.warn('Injection script is already loaded.')
+    return console.warn('React DevTools injection script is already loaded.')
   }
 
   require('./build/inject')
