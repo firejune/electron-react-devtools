@@ -8,7 +8,6 @@ PACKAGE_TMP=$(mktemp -d -t devtools.XXXX)
 
 mkdir "$PACKAGE_TMP/react-devtools-chrome/"
 rsync -R \
-  build/backend.js \
   build/background.js \
   build/contentScript.js \
   build/inject.js \
