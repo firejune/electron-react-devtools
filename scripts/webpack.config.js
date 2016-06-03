@@ -50,6 +50,15 @@ module.exports = {
     new webpack.DefinePlugin({
       'process.env': {NODE_ENV: '"production"'}
     }),
+    new webpack.optimize.UglifyJsPlugin({
+      // sourceMap: true,
+      compress: {
+        warnings: false
+      },
+      mangle: {
+        keep_fnames: true
+      }
+    }),
     new webpack.optimize.OccurenceOrderPlugin()
   ]
 };
