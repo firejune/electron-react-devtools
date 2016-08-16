@@ -35,5 +35,3 @@ var script = document.createElement('script');
 script.textContent = js + saveNativeValues;
 document.documentElement.appendChild(script);
 script.parentNode.removeChild(script);
-
-require('./backend.js');

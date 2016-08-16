@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "React Developer Tools",
   "description": "Adds React debugging tools to the Chrome Developer Tools.",
-  "version": "0.14.11",
+  "version": "0.15.0",
   "minimum_chrome_version": "43",
   "icons": {
     "48": "icons/icon48.png",
@@ -12,7 +12,7 @@
   "devtools_page": "main.html",
 
   "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
-  "web_accessible_resources": [ "main.html", "panel.html"],
+  "web_accessible_resources": [ "main.html", "panel.html", "build/backend.js"],
 
   "background": {
     "scripts": [ "build/background.js" ],

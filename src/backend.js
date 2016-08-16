@@ -10,7 +10,6 @@
  */
 'use strict';
 
-var portfinder = require('portfinder');
 var Agent = require('./agent/Agent');
 var BananaSlugBackendManager = require('./plugins/BananaSlug/BananaSlugBackendManager');
 var Bridge = require('./agent/Bridge');
@@ -25,68 +24,36 @@ setInterval(function() {
 }, 100);
 
 
-portfinder.getPort((err, port) => {
-  // `port` is guaranteed to be a free port
-  // in this scope.
+window.addEventListener('message', welcome);
+function welcome(evt) {
+  if (evt.data.source !== 'react-devtools-content-script') {
+    return;
+  }
 
-  var ws = require('ws');
-  var server = new ws.Server({ port });
-  var connected = false;
-  server.on('connection', (socket) => {
-    if (connected) {
-      console.warn('only one connection allowed at a time');
-      socket.close();
-      return;
-    }
-    connected = true;
-    socket.onerror = (err) => {
-      connected = false;
-      console.log('Error with websocket connection', err);
-    };
+  window.removeEventListener('message', welcome);
+  setup(window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
+}
 
-    socket.onclose = () => {
-      connected = false;
-      console.log('Connection to RN closed');
-    };
-
-    socket.onmessage = (evt) => {
-      setup(socket);
-    };
-  });
-
-  server.on('error', function (e) {
-    console.error('Failed to start the DevTools server', e);
-  });
-
-  window.__REACT_DEVTOOLS_GLOBAL_HOOK__.prot = port;
-});
-
-function setup(socket) {
-  var hook = window.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+function setup(hook) {
   var listeners = [];
+
   var wall = {
-    listen: function listen(fn) {
-      var listener = function listener(evt) {
-	      var data = JSON.parse(evt.data);
-        // console.debug('background.receive', data);
-        if (data.source !== 'react-devtools-content-script' || !data.payload) {
+    listen(fn) {
+      var listener = evt => {
+        if (evt.data.source !== 'react-devtools-content-script' || !evt.data.payload) {
           return;
         }
-        fn(data.payload);
+        fn(evt.data.payload);
       };
       listeners.push(listener);
-      socket.onmessage = listener;
+      window.addEventListener('message', listener);
     },
-    send: function send(data) {
-	    // console.debug('background.sender', data);
-      socket.send(JSON.stringify({
+    send(data) {
+      window.postMessage({
         source: 'react-devtools-bridge',
-        payload: data
-      }));
+        payload: data,
+      }, '*');
     },
-    disconnect: function disconnect() {
-      socket.close();
-    }
   };
 
   var isReactNative = !!hook.resolveRNStyle;

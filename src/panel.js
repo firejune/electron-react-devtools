@@ -67,52 +67,31 @@ var config: Props = {
       }
     });
   },
-  getPort(done) {
-    chrome.devtools.inspectedWindow.eval('window.__REACT_DEVTOOLS_GLOBAL_HOOK__.prot', (port, err) => {
-      if (err) {
-        return console.error('Failed get server port', err);
-      }
-      done(port);
-    });
-  },
   inject(done) {
-    this.getPort(port => {
+    inject(chrome.runtime.getURL('build/backend.js'), () => {
+      var port = chrome.runtime.connect({
+        name: '' + chrome.devtools.inspectedWindow.tabId,
+      });
       var disconnected = false;
-      var ws = new WebSocket(`ws://localhost:${port}`);
-      ws.onopen = function() {
-        var wall = {
-          listen(fn) {
-            ws.onmessage = function (evt) {
-  	          var data = JSON.parse(evt.data);
-              fn(data.payload);
-            };
-          },
-          send(data) {
-            if (disconnected) {
-              return;
-            }
 
-            var data = JSON.stringify({
-  	          source: 'react-devtools-content-script',
-  	          payload: data
-            });
-
-            ws.send(data);
-          }
-        };
-
-    	  done(wall, () => {
+      var wall = {
+        listen(fn) {
+          port.onMessage.addListener(message => fn(message));
+        },
+        send(data) {
           if (disconnected) {
             return;
           }
-          ws.close();
-        });
+          port.postMessage(data);
+        },
       };
-      ws.onclose = function () {
+
+      port.onDisconnect.addListener(() => {
         disconnected = true;
-      };
+      });
+      done(wall, () => port.disconnect());
     });
-  }
+  },
 };
 
 var Panel = require('./frontend/Panel');
