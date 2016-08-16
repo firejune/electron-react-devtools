@@ -1,14 +1,5 @@
 const electron = require('electron')
 
-// load injection scripts menualy
-exports.inject = () => {
-  if (global.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined) {
-    return console.warn('React DevTools injection script is already loaded.')
-  }
-
-  require('./build/inject')
-}
-
 // devtools-extension install
 exports.install = () => {
   if (!electron.remote) {
@@ -16,7 +7,6 @@ exports.install = () => {
   }
 
   console.log(`Installing React DevTools from ${__dirname}`)
-  exports.inject();
 
   return electron.remote.BrowserWindow.addDevToolsExtension(__dirname)
 }
