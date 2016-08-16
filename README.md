@@ -15,20 +15,6 @@ or
 npm install --save-dev firejune/electron-react-devtools
 ```
 
-Then add the React's injection script to `main.html`(or entry root js) before loading your app
-source running on renderer process(Not Required the Electron version 1.2.1 or later):
-```html
-<script>
-  // in development.
-  if (process.env.NODE_ENV !== 'production') {
-    require('electron-react-devtools').inject()
-  }
-
-  // your app root running on renderer process.
-  ...
-</script>
-```
-
 Should not visible React DevTools message('Download the React DevTools
 and ...') in `Console` tab.
 
@@ -39,7 +25,7 @@ developer tools:
 require('electron-react-devtools').install()
 ```
 
-You should then see a `React` tab added.
+And than refresh or restart the renderer process, you can see a `React` tab added.
 
 ## To hack on the plugin
 
