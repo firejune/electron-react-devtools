@@ -1,5 +1,7 @@
 # React DevTools Extension for Electron
 
+[![NPM](https://nodei.co/npm/electron-react-devtools.png)](https://nodei.co/npm/electron-react-devtools/)
+
 Unfortunately, [React DevTools](https://github.com/facebook/react-devtools)
 is not working with [Electron](http://electron.atom.io/)(<=v1.2.0). Because not implemented
 `chrome.runtime*` APIs and not support `Background Pages` in Electron. So I fix
@@ -70,4 +72,3 @@ chrome` is enabled.
 To deal with this, [`src/inject.js`](src/inject.js) calls
 `document.constructor.prototype.createElement` when it needs to create a
 `<script>` tag.
-
