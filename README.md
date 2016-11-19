@@ -17,7 +17,7 @@ or
 npm install --save-dev firejune/electron-react-devtools
 ```
 
-Should not visible React DevTools message('Download the React DevTools
+You will still see the React DevTools message('Download the React DevTools
 and ...') in `Console` tab.
 
 Then execute the following from the Console tab of your running Electron app's
