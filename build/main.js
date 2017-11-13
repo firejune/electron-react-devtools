@@ -1,1 +1,38 @@
-!function(e){function __webpack_require__(r){if(n[r])return n[r].exports;var a=n[r]={exports:{},id:r,loaded:!1};return e[r].call(a.exports,a,a.exports,__webpack_require__),a.loaded=!0,a.exports}var n={};return __webpack_require__.m=e,__webpack_require__.c=n,__webpack_require__.p="",__webpack_require__(0)}([function(e,n){"use strict";function createPanelIfReactLoaded(){r||chrome.devtools.inspectedWindow.eval("!!(\n    Object.keys(window.__REACT_DEVTOOLS_GLOBAL_HOOK__._renderers).length || window.React\n  )",function(e,n){e&&!r&&(clearInterval(a),r=!0,chrome.devtools.panels.create("React","","panel.html",function(e){var n=null;e.onShown.addListener(function(e){e.panel.getNewSelection(),n=e.panel,n.resumeTransfer()}),e.onHidden.addListener(function(){n&&(n.hideHighlight(),n.pauseTransfer())})}))})}var r=!1;chrome.devtools.network.onNavigated.addListener(function(){createPanelIfReactLoaded()});var a=setInterval(function(){createPanelIfReactLoaded()},1e3);createPanelIfReactLoaded()}]);
+!function(modules) {
+    function __webpack_require__(moduleId) {
+        if (installedModules[moduleId]) return installedModules[moduleId].exports;
+        var module = installedModules[moduleId] = {
+            exports: {},
+            id: moduleId,
+            loaded: !1
+        };
+        return modules[moduleId].call(module.exports, module, module.exports, __webpack_require__), 
+        module.loaded = !0, module.exports;
+    }
+    var installedModules = {};
+    return __webpack_require__.m = modules, __webpack_require__.c = installedModules, 
+    __webpack_require__.p = "", __webpack_require__(0);
+}([ function(module, exports) {
+    "use strict";
+    function createPanelIfReactLoaded() {
+        panelCreated || chrome.devtools.inspectedWindow.eval("!!(\n    Object.keys(window.__REACT_DEVTOOLS_GLOBAL_HOOK__._renderers).length || window.React\n  )", function(pageHasReact, err) {
+            pageHasReact && !panelCreated && (clearInterval(loadCheckInterval), panelCreated = !0, 
+            chrome.devtools.panels.create("React", "", "panel.html", function(panel) {
+                var reactPanel = null;
+                panel.onShown.addListener(function(window) {
+                    window.panel.getNewSelection(), reactPanel = window.panel, reactPanel.resumeTransfer();
+                }), panel.onHidden.addListener(function() {
+                    reactPanel && (reactPanel.hideHighlight(), reactPanel.pauseTransfer());
+                });
+            }));
+        });
+    }
+    var panelCreated = !1;
+    chrome.devtools.network.onNavigated.addListener(function() {
+        createPanelIfReactLoaded();
+    });
+    var loadCheckInterval = setInterval(function() {
+        createPanelIfReactLoaded();
+    }, 1e3);
+    createPanelIfReactLoaded();
+} ]);
