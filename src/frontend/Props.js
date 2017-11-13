@@ -12,18 +12,21 @@
 
 var React = require('react');
 var PropVal = require('./PropVal');
+var {getInvertedMid} = require('./Themes/utils');
+
+import type {Theme} from './types';
 
 class Props extends React.Component {
-  props: Object;
+  context: {
+    theme: Theme,
+  };
   shouldComponentUpdate(nextProps: Object): boolean {
-    if (nextProps === this.props) {
-      return false;
-    }
-    return true;
+    return nextProps.props !== this.props.props || nextProps.inverted !== this.props.inverted;
   }
 
   render() {
-    var props = this.props.props;
+    var theme = this.context.theme;
+    var {inverted, props} = this.props;
     if (!props || typeof props !== 'object') {
       return <span/>;
     }
@@ -33,31 +36,39 @@ class Props extends React.Component {
     });
 
     var items = [];
+
     names.slice(0, 3).forEach(name => {
       items.push(
-        <span key={name} style={styles.prop}>
-          <span style={styles.propName}>{name}</span>
+        <span key={'prop-' + name} style={propStype(inverted, theme)}>
+          <span style={attributeNameStyle(inverted, theme)}>{name}</span>
           =
-          <PropVal val={props[name]}/>
+          <PropVal val={props[name]} inverted={inverted}/>
         </span>
       );
     });
 
     if (names.length > 3) {
-      items.push('…');
+      items.push(<span key="ellipsis" style={ellipsisStyle(inverted, theme)}>…</span>);
     }
     return <span>{items}</span>;
   }
 }
 
-var styles = {
-  prop: {
-    paddingLeft: 5,
-  },
-
-  propName: {
-    color: 'rgb(165, 103, 42)',
-  },
+Props.contextTypes = {
+  theme: React.PropTypes.object.isRequired,
 };
+
+const attributeNameStyle = (isInverted: boolean, theme: Theme) => ({
+  color: isInverted ? getInvertedMid(theme.state02) : theme.special06,
+});
+
+const ellipsisStyle = (isInverted: boolean, theme: Theme) => ({
+  color: isInverted ? getInvertedMid(theme.state02) : theme.special06,
+});
+
+const propStype = (isInverted: boolean, theme: Theme) => ({
+  paddingLeft: 5,
+  color: isInverted ? getInvertedMid(theme.state02) : theme.special06,
+});
 
 module.exports = Props;

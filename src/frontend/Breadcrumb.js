@@ -12,29 +12,49 @@
 
 import type Store from './Store';
 import type {ElementID} from './types';
+import type {Theme} from './types';
 
+var {sansSerif} = require('./Themes/Fonts');
 var React = require('react');
-var assign = require('object-assign');
 var decorate = require('./decorate');
 
 class Breadcrumb extends React.Component {
+  context: {theme: Theme};
+  state: {hovered: ?string};
+
+  constructor(props) {
+    super(props);
+    this.state = { hovered: null };
+  }
+
+  handleCrumbMouseOver(id) {
+    this.setState({ hovered: id });
+    this.props.hover(id, true);
+  }
+
+  handleCrumbMouseOut(id) {
+    this.setState({ hovered: null });
+    this.props.hover(id, false);
+  }
+
   render() {
+    var theme = this.context.theme;
     return (
-      <ul style={styles.container}>
-        {this.props.path.map(({id, node}) => {
-          var isSelected = id === this.props.selected;
-          var style = assign(
-            {},
-            styles.item,
-            node.get('nodeType') === 'Composite' && styles.composite,
-            isSelected && styles.selected
+      <ul style={containerStyle(theme)}>
+        {this.props.path.map(({ id, node }) => {
+          const isSelected = id === this.props.selected;
+          const style = itemStyle(
+            isSelected,
+            node.get('nodeType') === 'Composite',
+            theme,
           );
+
           return (
             <li
               style={style}
               key={id}
-              onMouseOver={() => this.props.hover(id, true)}
-              onMouseOut={() => this.props.hover(id, false)}
+              onMouseOver={() => this.handleCrumbMouseOver(id)}
+              onMouseOut={() => this.handleCrumbMouseOut(id)}
               onClick={isSelected ? null : () => this.props.select(id)}
             >
               {node.get('name') || '"' + node.get('text') + '"'}
@@ -46,30 +66,41 @@ class Breadcrumb extends React.Component {
   }
 }
 
-var styles = {
-  container: {
-    borderTop: '1px solid #ccc',
-    backgroundColor: 'white',
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-  },
+Breadcrumb.contextTypes = {
+  theme: React.PropTypes.object.isRequired,
+};
 
-  selected: {
-    cursor: 'default',
-    backgroundColor: 'rgb(56, 121, 217)',
-    color: 'white',
-  },
+const containerStyle = (theme: Theme) => ({
+  fontFamily: sansSerif.family,
+  listStyle: 'none',
+  padding: 0,
+  margin: 0,
+  maxHeight: '80px',
+  overflow: 'auto',
+  marginTop: '2px',
+  backgroundColor: theme.base01,
+  borderTop: `1px solid ${theme.base03}`,
+});
 
-  composite: {
-    color: 'rgb(136, 18, 128)',
-  },
+const itemStyle = (isSelected: boolean, isComposite: boolean, theme: Theme) => {
+  let color;
+  if (isSelected) {
+    color = theme.state02;
+  } else if (isComposite) {
+    color = theme.special05;
+  }
 
-  item: {
-    padding: '3px 7px',
-    cursor: 'pointer',
+  return {
+    backgroundColor: isSelected ? theme.state00 : 'transparent',
+    color,
+    cursor: isSelected ? 'default' : 'pointer',
+    padding: '0.25rem 0.5rem',
+    WebkitUserSelect: 'none',
+    MozUserSelect: 'none',
+    userSelect: 'none',
     display: 'inline-block',
-  },
+    marginRight: '2px',
+  };
 };
 
 function getBreadcrumbPath(store: Store): Array<{id: ElementID, node: Object}> {
@@ -90,7 +121,7 @@ module.exports = decorate({
   props(store, props) {
     return {
       select: id => store.selectBreadcrumb(id),
-      hover: (id, isHovered) => store.setHover(id, isHovered),
+      hover: (id, isHovered) => store.setHover(id, isHovered, false),
       selected: store.selected,
       path: getBreadcrumbPath(store),
     };

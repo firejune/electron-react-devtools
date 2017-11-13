@@ -13,12 +13,16 @@
 var {EventEmitter} = require('events');
 var {Map, Set, List} = require('immutable');
 var assign = require('object-assign');
+var { copy } = require('clipboard-js');
 var nodeMatchesText = require('./nodeMatchesText');
 var consts = require('../agent/consts');
+var serializePropsForCopy = require('../utils/serializePropsForCopy');
 var invariant = require('./invariant');
+var SearchUtils = require('./SearchUtils');
+var ThemeStore = require('./Themes/Store');
 
 import type Bridge from '../agent/Bridge';
-import type {ControlState, DOMEvent, ElementID} from './types';
+import type {ControlState, DOMEvent, ElementID, Theme} from './types';
 
 type ListenerFunction = () => void;
 type DataType = Map;
@@ -28,8 +32,6 @@ type ContextMenu = {
   y: number,
   args: Array<any>,
 };
-
-const DEFAULT_PLACEHOLDER = 'Search by Component Name';
 
 /**
  * This is the main frontend [fluxy?] Store, responsible for taking care of
@@ -63,9 +65,10 @@ const DEFAULT_PLACEHOLDER = 'Search by Component Name';
  * - hideContextMenu
  * - selectFirstSearchResult
  * - toggleCollapse
+ * - toggleAllChildrenNodes
  * - setProps/State/Context
  * - makeGlobal(id, path)
- * - setHover(id, isHovered)
+ * - setHover(id, isHovered, isBottomTag)
  * - selectTop(id)
  * - selectBottom(id)
  * - select(id)
@@ -87,33 +90,39 @@ class Store extends EventEmitter {
   _eventTimer: ?number;
 
   // Public state
-  bananaslugState: ?ControlState;
+  isInspectEnabled: boolean;
+  traceupdatesState: ?ControlState;
   colorizerState: ?ControlState;
-  regexState: ?ControlState;
   contextMenu: ?ContextMenu;
   hovered: ?ElementID;
+  isBottomTagHovered: boolean;
   isBottomTagSelected: boolean;
-  placeholderText: string;
+  preferencesPanelShown: boolean;
   refreshSearch: boolean;
   roots: List;
   searchRoots: ?List;
   searchText: string;
   selectedTab: string;
   selected: ?ElementID;
+  themeStore: ThemeStore;
   breadcrumbHead: ?ElementID;
   // an object describing the capabilities of the inspected runtime.
   capabilities: {
     scroll?: boolean,
+    rnStyle?: boolean,
+    rnStyleMeasure?: boolean,
   };
 
-  constructor(bridge: Bridge) {
+  constructor(bridge: Bridge, themeStore: ThemeStore) {
     super();
+
     this._nodes = new Map();
     this._parents = new Map();
     this._nodesByName = new Map();
     this._bridge = bridge;
 
     // Public state
+    this.isInspectEnabled = false;
     this.roots = new List();
     this.contextMenu = null;
     this.searchRoots = null;
@@ -121,14 +130,14 @@ class Store extends EventEmitter {
     this.selected = null;
     this.selectedTab = 'Elements';
     this.breadcrumbHead = null;
+    this.isBottomTagHovered = false;
     this.isBottomTagSelected = false;
     this.searchText = '';
     this.capabilities = {};
-    this.bananaslugState = null;
+    this.traceupdatesState = null;
     this.colorizerState = null;
-    this.regexState = null;
-    this.placeholderText = DEFAULT_PLACEHOLDER;
     this.refreshSearch = false;
+    this.themeStore = themeStore;
 
     // for debugging
     window.store = this;
@@ -150,8 +159,19 @@ class Store extends EventEmitter {
     });
     this._bridge.on('mount', (data) => this._mountComponent(data));
     this._bridge.on('update', (data) => this._updateComponent(data));
-    this._bridge.on('unmount', id => this._unmountComponenent(id));
-    this._bridge.on('select', ({id, quiet}) => {
+    this._bridge.on('unmount', id => this._unmountComponent(id));
+    this._bridge.on('setInspectEnabled', (data) => this.setInspectEnabled(data));
+    this._bridge.on('select', ({id, quiet, offsetFromLeaf = 0}) => {
+      // Backtrack if we want to skip leaf nodes
+      while (offsetFromLeaf > 0) {
+        offsetFromLeaf--;
+        var pid = this._parents.get(id);
+        if (pid) {
+          id = pid;
+        } else {
+          break;
+        }
+      }
       this._revealDeep(id);
       this.selectTop(this.skipWrapper(id), quiet);
       this.setSelectedTab('Elements');
@@ -163,26 +183,39 @@ class Store extends EventEmitter {
   }
 
   emit(event: string): boolean {
+    if (this._eventQueue.indexOf(event) !== -1) {
+      // to appease flow
+      return true;
+    }
+    this._eventQueue.push(event);
     if (!this._eventTimer) {
-      this._eventTimer = setTimeout(() => {
-        this._eventQueue.forEach(evt => {
-          EventEmitter.prototype.emit.call(this, evt);
-        });
-        this._eventQueue = [];
-        this._eventTimer = null;
-      }, 50);
-      this._eventQueue = [];
+      this._eventTimer = setTimeout(() => this.flush(), 50);
     }
-    if (this._eventQueue.indexOf(event) === -1) {
-      this._eventQueue.push(event);
-    }
-    // to appease flow
     return true;
+  }
+
+  flush() {
+    if (this._eventTimer) {
+      clearTimeout(this._eventTimer);
+      this._eventTimer = null;
+    }
+    this._eventQueue.forEach(evt => {
+      EventEmitter.prototype.emit.call(this, evt);
+    });
+    this._eventQueue = [];
   }
 
   // Public actions
   scrollToNode(id: ElementID): void {
     this._bridge.send('scrollToNode', id);
+  }
+
+  copyNodeName(name: string): void {
+    copy(name);
+  }
+
+  copyNodeProps(props: Object): void {
+    copy(serializePropsForCopy(props));
   }
 
   setSelectedTab(name: string): void {
@@ -212,13 +245,13 @@ class Store extends EventEmitter {
     if (needle === this.searchText.toLowerCase() && !this.refreshSearch) {
       return;
     }
-    if (!text) {
+    if (!text || SearchUtils.trimSearchText(text).length === 0) {
       this.searchRoots = null;
     } else {
       if (
         this.searchRoots &&
         needle.indexOf(this.searchText.toLowerCase()) === 0 &&
-        (!this.regexState || !this.regexState.enabled)
+        !SearchUtils.shouldSearchUseRegex(text)
       ) {
         this.searchRoots = this.searchRoots
           .filter(item => {
@@ -254,6 +287,9 @@ class Store extends EventEmitter {
 
     this.highlightSearch();
     this.refreshSearch = false;
+
+    // Search input depends on this change being flushed synchronously.
+    this.flush();
   }
 
   highlight(id: string): void {
@@ -309,6 +345,31 @@ class Store extends EventEmitter {
     this.emit('contextMenu');
   }
 
+  changeTheme(themeName: ?string) {
+    this.themeStore.update(themeName);
+    this.emit('theme');
+  }
+
+  changeDefaultTheme(defaultThemeName: ?string) {
+    this.themeStore.setDefaultTheme(defaultThemeName);
+    this.emit('theme');
+  }
+
+  saveCustomTheme(theme: Theme) {
+    this.themeStore.saveCustomTheme(theme);
+    this.emit('theme');
+  }
+
+  showPreferencesPanel() {
+    this.preferencesPanelShown = true;
+    this.emit('preferencesPanelShown');
+  }
+
+  hidePreferencesPanel() {
+    this.preferencesPanelShown = false;
+    this.emit('preferencesPanelShown');
+  }
+
   selectFirstSearchResult() {
     if (this.searchRoots) {
       this.select(this.searchRoots.get(0), true);
@@ -332,6 +393,14 @@ class Store extends EventEmitter {
     this.emit(id);
   }
 
+  toggleAllChildrenNodes(value: boolean) {
+    var id = this.selected;
+    if (!id) {
+      return;
+    }
+    this._toggleDeepChildren(id, value);
+  }
+
   setProps(id: ElementID, path: Array<string>, value: any) {
     this._bridge.send('setProps', {id, path, value});
   }
@@ -348,10 +417,11 @@ class Store extends EventEmitter {
     this._bridge.send('makeGlobal', {id, path});
   }
 
-  setHover(id: ElementID, isHovered: boolean) {
+  setHover(id: ElementID, isHovered: boolean, isBottomTag: boolean) {
     if (isHovered) {
       var old = this.hovered;
       this.hovered = id;
+      this.isBottomTagHovered = isBottomTag;
       if (old) {
         this.emit(old);
       }
@@ -360,6 +430,7 @@ class Store extends EventEmitter {
       this.highlight(id);
     } else if (this.hovered === id) {
       this.hideHighlight();
+      this.isBottomTagHovered = false;
     }
   }
 
@@ -423,22 +494,37 @@ class Store extends EventEmitter {
     return this._parents.get(id);
   }
 
-  skipWrapper(id: ElementID, up?: boolean): ?ElementID {
+  skipWrapper(id: ElementID, up?: boolean, end?: boolean): ?ElementID {
     if (!id) {
       return undefined;
     }
-    var node = this.get(id);
-    var nodeType = node.get('nodeType');
-    if (nodeType !== 'Wrapper' && nodeType !== 'Native') {
-      return id;
+    while (true) {
+      var node = this.get(id);
+      var nodeType = node.get('nodeType');
+
+      if (nodeType !== 'Wrapper' && nodeType !== 'Native') {
+        return id;
+      }
+      if (nodeType === 'Native' && (!up || this.get(this._parents.get(id)).get('nodeType') !== 'NativeWrapper')) {
+        return id;
+      }
+      if (up) {
+        var parentId = this._parents.get(id);
+        if (!parentId) {
+          // Don't show the Stack root wrapper in breadcrumbs
+          return undefined;
+        }
+        id = parentId;
+      } else {
+        var children = node.get('children');
+        if (children.length === 0) {
+          return undefined;
+        }
+        var index = end ? children.length - 1 : 0;
+        var childId = children[index];
+        id = childId;
+      }
     }
-    if (nodeType === 'Native' && (!up || this.get(this._parents.get(id)).get('nodeType') !== 'NativeWrapper')) {
-      return id;
-    }
-    if (up) {
-      return this._parents.get(id);
-    }
-    return node.get('children')[0];
   }
 
   off(evt: string, fn: ListenerFunction): void {
@@ -459,19 +545,15 @@ class Store extends EventEmitter {
     });
   }
 
-  changeBananaSlug(state: ControlState) {
-    this.bananaslugState = state;
-    this.emit('bananaslugchange');
-    invariant(state.toJS);
-    this._bridge.send('bananaslugchange', state.toJS());
+  changeTraceUpdates(state: ControlState) {
+    this.traceupdatesState = state;
+    this.emit('traceupdatesstatechange');
+    invariant(state.toJS, 'state.toJS should exist');
+    this._bridge.send('traceupdatesstatechange', state.toJS());
   }
 
   changeColorizer(state: ControlState) {
     this.colorizerState = state;
-    this.placeholderText = this.colorizerState.enabled
-      ? 'Highlight by Component Name'
-      : DEFAULT_PLACEHOLDER;
-    this.emit('placeholderchange');
     this.emit('colorizerchange');
     this._bridge.send('colorizerchange', state.toJS());
     if (this.colorizerState && this.colorizerState.enabled) {
@@ -481,11 +563,10 @@ class Store extends EventEmitter {
     }
   }
 
-  changeRegex(state: ControlState) {
-    this.regexState = state;
-    this.emit('regexchange');
-    this.refreshSearch = true;
-    this.changeSearch(this.searchText);
+  setInspectEnabled(isInspectEnabled: boolean) {
+    this.isInspectEnabled = isInspectEnabled;
+    this.emit('isInspectEnabled');
+    this._bridge.send('setInspectEnabled', isInspectEnabled);
   }
 
   // Private stuff
@@ -524,6 +605,21 @@ class Store extends EventEmitter {
         return;
       }
       pid = this._parents.get(pid);
+    }
+  }
+
+  _toggleDeepChildren(id: ElementID, value: boolean) {
+    var node = this._nodes.get(id);
+    if (!node) {
+      return;
+    }
+    if (node.get('collapsed') !== value) {
+      this._nodes = this._nodes.setIn([id, 'collapsed'], value);
+      this.emit(id);
+    }
+    var children = node.get('children');
+    if (children && children.forEach) {
+      children.forEach(cid => this._toggleDeepChildren(cid, value));
     }
   }
 
@@ -574,7 +670,7 @@ class Store extends EventEmitter {
     this.emit(data.id);
   }
 
-  _unmountComponenent(id: ElementID) {
+  _unmountComponent(id: ElementID) {
     var pid = this._parents.get(id);
     this._removeFromNodesByName(id);
     this._parents = this._parents.delete(id);

@@ -17,10 +17,43 @@ var inject = require('./inject');
 
 import type {Props} from './frontend/Panel';
 
+const IS_CHROME = navigator.userAgent.indexOf('Firefox') < 0;
+
+let browserName;
+let themeName;
+
+if (IS_CHROME) {
+  browserName = 'Chrome';
+
+  // chrome.devtools.panels added in Chrome 18.
+  // chrome.devtools.panels.themeName added in Chrome 54.
+  themeName = chrome.devtools.panels.themeName === 'dark'
+    ? 'ChromeDark'
+    : 'ChromeDefault';
+} else {
+  browserName = 'Firefox';
+  themeName = 'FirefoxLight';
+
+  // chrome.devtools.panels.themeName added in Firefox 55.
+  // https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/devtools.panels/themeName
+  if (chrome.devtools && chrome.devtools.panels) {
+    switch (chrome.devtools.panels.themeName) {
+      case 'dark':
+        themeName = 'FirefoxDark';
+        break;
+      case 'firebug':
+        themeName = 'FirefoxFirebug';
+        break;
+    }
+  }
+}
+
 var config: Props = {
-  reload,
-  checkForReact,
   alreadyFoundReact: false,
+  browserName,
+  checkForReact,
+  reload,
+  themeName,
   reloadSubscribe(reloadFn) {
     chrome.devtools.network.onNavigated.addListener(reloadFn);
     return () => {
@@ -37,12 +70,18 @@ var config: Props = {
       chrome.devtools.inspectedWindow.eval('inspect(window.__REACT_DEVTOOLS_GLOBAL_HOOK__.$node)');
     }, 100);
   },
-  showComponentSource(vbl) {
-    // if it is an es6 class-based component, (isMounted throws), then inspect
-    // the constructor. Otherwise, inspect the render function.
-    var code = `Object.getOwnPropertyDescriptor(window.${vbl}.__proto__.__proto__, 'isMounted') &&
-      Object.getOwnPropertyDescriptor(window.${vbl}.__proto__.__proto__, 'isMounted').value ?
-        inspect(window.${vbl}.render) : inspect(window.${vbl}.constructor)`;
+  showComponentSource(globalPathToInst, globalPathToType) {
+    var code = `
+      if (
+        window.${globalPathToType} &&
+        window.${globalPathToType}.prototype &&
+        window.${globalPathToType}.prototype.isReactComponent
+      ) {
+        inspect(window.${globalPathToInst}.render);
+      } else {
+        inspect(window.${globalPathToType});
+      }
+    `;
     chrome.devtools.inspectedWindow.eval(code, (res, err) => {
       if (err) {
         console.error('Failed to inspect component', err);
@@ -108,4 +147,4 @@ function reload() {
   }, 100);
 }
 
-ReactDOM.render(<Panel alreadyFoundReact={true} {...config} />, node);
+ReactDOM.render(<Panel {...config} />, node);

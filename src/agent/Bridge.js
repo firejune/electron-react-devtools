@@ -13,12 +13,51 @@
 var consts = require('./consts');
 var hydrate = require('./hydrate');
 var dehydrate = require('./dehydrate');
+var getIn = require('./getIn');
 var performanceNow = require('fbjs/lib/performanceNow');
+
+// Use the polyfill if the function is not native implementation
+function getWindowFunction(name, polyfill): Function {
+  if (String(window[name]).indexOf('[native code]') === -1) {
+    return polyfill;
+  }
+  return window[name];
+}
+
+// Custom polyfill that runs the queue with a backoff.
+// If you change it, make sure it behaves reasonably well in Firefox.
+var lastRunTimeMS = 5;
+var cancelIdleCallback = getWindowFunction('cancelIdleCallback', clearTimeout);
+var requestIdleCallback = getWindowFunction('requestIdleCallback', function(cb, options) {
+  // Magic numbers determined by tweaking in Firefox.
+  // There is no special meaning to them.
+  var delayMS = 3000 * lastRunTimeMS;
+  if (delayMS > 500) {
+    delayMS = 500;
+  }
+
+  return setTimeout(() => {
+    var startTime = performanceNow();
+    cb({
+      didTimeout: false,
+      timeRemaining() {
+        return Infinity;
+      },
+    });
+    var endTime = performanceNow();
+    lastRunTimeMS = (endTime - startTime) / 1000;
+  }, delayMS);
+});
 
 type AnyFn = (...x: any) => any;
 export type Wall = {
   listen: (fn: (data: PayloadType) => void) => void,
   send: (data: PayloadType) => void,
+};
+
+type IdleDeadline = {
+  didTimeout: bool,
+  timeRemaining: () => number,
 };
 
 type EventPayload = {
@@ -112,9 +151,8 @@ class Bridge {
   _cbs: Map;
   _cid: number;
   _inspectables: Map;
-  _lastTime: number;
   _listeners: {[key: string]: Array<(data: any) => void>};
-  _waiting: ?number;
+  _flushHandle: ?number;
   _wall: Wall;
   _callers: {[key: string]: AnyFn};
   _paused: boolean;
@@ -125,8 +163,7 @@ class Bridge {
     this._cid = 0;
     this._listeners = {};
     this._buffer = [];
-    this._waiting = null;
-    this._lastTime = 5;
+    this._flushHandle = null;
     this._callers = {};
     this._paused = false;
     this._wall = wall;
@@ -197,34 +234,56 @@ class Bridge {
     this._inspectables.set(id, {...prev, ...data});
   }
 
-  sendOne(evt: string, data: any) {
-    var cleaned = [];
-    var san = dehydrate(data, cleaned);
-    if (cleaned.length) {
-      this.setInspectable(data.id, data);
-    }
-    this._wall.send({type: 'event', evt, data: san, cleaned});
-  }
-
   send(evt: string, data: any) {
-    if (!this._waiting && !this._paused) {
-      this._buffer = [];
-      var nextTime = this._lastTime * 3;
-      if (nextTime > 500) {
-        // flush is taking an unexpected amount of time
-        nextTime = 500;
-      }
-      this._waiting = setTimeout(() => {
-        this.flush();
-        this._waiting = null;
-      }, nextTime);
-    }
     this._buffer.push({evt, data});
+    this.scheduleFlush();
   }
 
-  flush() {
-    var start = performanceNow();
-    var events = this._buffer.map(({evt, data}) => {
+  scheduleFlush() {
+    if (!this._flushHandle && this._buffer.length) {
+      var timeout = this._paused ? 5000 : 500;
+      this._flushHandle = requestIdleCallback(
+        this.flushBufferWhileIdle.bind(this),
+        {timeout}
+      );
+    }
+  }
+
+  cancelFlush() {
+    if (this._flushHandle) {
+      cancelIdleCallback(this._flushHandle);
+      this._flushHandle = null;
+    }
+  }
+
+  flushBufferWhileIdle(deadline: IdleDeadline) {
+    this._flushHandle = null;
+
+    // Magic numbers were determined by tweaking in a heavy UI and seeing
+    // what performs reasonably well both when DevTools are hidden and visible.
+    // The goal is that we try to catch up but avoid blocking the UI.
+    // When paused, it's okay to lag more, but not forever because otherwise
+    // when user activates React tab, it will freeze syncing.
+    var chunkCount = this._paused ? 20 : 10;
+    var chunkSize = Math.round(this._buffer.length / chunkCount);
+    var minChunkSize = this._paused ? 50 : 100;
+
+    while (this._buffer.length && (
+      deadline.timeRemaining() > 0 ||
+      deadline.didTimeout
+    )) {
+      var take = Math.min(this._buffer.length, Math.max(minChunkSize, chunkSize));
+      var currentBuffer = this._buffer.splice(0, take);
+      this.flushBufferSlice(currentBuffer);
+    }
+
+    if (this._buffer.length) {
+      this.scheduleFlush();
+    }
+  }
+
+  flushBufferSlice(bufferSlice: Array<{evt: string, data: any}>) {
+    var events = bufferSlice.map(({evt, data}) => {
       var cleaned = [];
       var san = dehydrate(data, cleaned);
       if (cleaned.length) {
@@ -233,9 +292,6 @@ class Bridge {
       return {type: 'event', evt, data: san, cleaned};
     });
     this._wall.send({type: 'many-events', events});
-    this._buffer = [];
-    this._waiting = null;
-    this._lastTime = performanceNow() - start;
   }
 
   forget(id: string) {
@@ -272,15 +328,13 @@ class Bridge {
   _handleMessage(payload: PayloadType) {
     if (payload.type === 'resume') {
       this._paused = false;
-      this._waiting = null;
-      this.flush();
+      this.scheduleFlush();
       return;
     }
 
     if (payload.type === 'pause') {
       this._paused = true;
-      clearTimeout(this._waiting);
-      this._waiting = null;
+      this.cancelFlush();
       return;
     }
 
@@ -351,15 +405,30 @@ class Bridge {
 
   _inspectResponse(id: string, path: Array<string>, callback: number) {
     var inspectable = this._inspectables.get(id);
-
     var result = {};
     var cleaned = [];
     var proto = null;
     var protoclean = [];
+
     if (inspectable) {
       var val = getIn(inspectable, path);
       var protod = false;
       var isFn = typeof val === 'function';
+
+      if (val && typeof val[Symbol.iterator] === 'function') {
+        var iterVal = Object.create({});  // flow throws "object literal incompatible with object type"
+        var count = 0;
+        for (const entry of val) {
+          if (count > 100) {
+            // TODO: replace this if block with better logic to handle large iterables
+            break;
+          }
+          iterVal[count] = entry;
+          count++;
+        }
+        val = iterVal;
+      }
+
       Object.getOwnPropertyNames(val).forEach(name => {
         if (name === '__proto__') {
           protod = true;
@@ -391,12 +460,6 @@ class Bridge {
       args: [result, cleaned, proto, protoclean],
     });
   }
-}
-
-function getIn(base, path) {
-  return path.reduce((obj, attr) => {
-    return obj ? obj[attr] : null;
-  }, base);
 }
 
 module.exports = Bridge;
