@@ -9,56 +9,38 @@
  */
 'use strict';
 
-const webpack = require('webpack');
-const __DEV__ = process.env.NODE_ENV !== 'production';
+var webpack = require('webpack');
+var __DEV__ = process.env.NODE_ENV !== 'production';
 
 module.exports = {
-  devtool: __DEV__ ? 'cheap-module-eval-source-map' : false,
-
+  devtool: __DEV__ ? '#cheap-module-eval-source-map' : false,
   entry: {
-    main: './src/main.js',
-    background: './src/background.js',
-    contentScript: './src/contentScript.js',
-    panel: './src/panel.js',
+    main: '../src/main.js',
+    background: '../src/background.js',
+    inject: '../src/GlobalHook.js',
+    contentScript: '../src/contentScript.js',
+    panel: '../src/panel.js',
   },
-
   output: {
     path: './build',
     filename: '[name].js',
   },
-
+  plugins: __DEV__ ? [] : [
+    // Ensure we get production React
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': '"production"',
+    }),
+    // Remove dead code but keep it readable:
+    new webpack.optimize.UglifyJsPlugin({
+      mangle: false,
+      beautify: true,
+    }),
+  ],
   module: {
     loaders: [{
       test: /\.js$/,
       loader:  'babel',
       exclude: /node_modules/,
-      query: {
-        babelrc: false,
-        presets: [
-          'es2015',
-          'react',
-          'stage-0'
-        ],
-        plugins: [
-          'transform-remove-console'
-        ]
-      }
     }],
   },
-
-  plugins: [
-    new webpack.DefinePlugin({
-      'process.env': {NODE_ENV: '"production"'}
-    }),
-    new webpack.optimize.UglifyJsPlugin({
-      // sourceMap: true,
-      compress: {
-        warnings: false
-      },
-      mangle: {
-        keep_fnames: true
-      }
-    }),
-    new webpack.optimize.OccurenceOrderPlugin()
-  ]
 };
