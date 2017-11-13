@@ -3,6 +3,6 @@
 .eslintrc
 .flowconfig
 .npmignore
-/build/react-devtools-chrome.zip
+/build/packed.zip
 /scripts
 /src

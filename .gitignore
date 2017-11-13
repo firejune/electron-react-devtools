@@ -1,4 +1,4 @@
 .DS_Store
-build/react-devtools-chrome.zip
-node_modules/
+build/packed.zip
+node_modules
 npm-debug.log
