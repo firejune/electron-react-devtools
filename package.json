@@ -1,6 +1,6 @@
 {
   "name": "electron-react-devtools",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "React DevTools Extension for Electron",
   "main": "./api.js",
   "repository": {
@@ -29,7 +29,7 @@
     "build": "node ./scripts/build",
     "deploy": "cd ./shells/theme-preview && ./build.sh && gh-pages -d .",
     "lint": "eslint .",
-    "postinstall": "lerna bootstrap",
+    "bootstrap": "lerna bootstrap",
     "pack": "NODE_ENV=production webpack --config scripts/webpack.config.js",
     "test": "node --harmony ./node_modules/.bin/jest",
     "typecheck": "flow check"
