@@ -24,3 +24,5 @@ exports.uninstall = () => {
   }
   return electron.remote.BrowserWindow.removeDevToolsExtension('React Developer Tools')
 }
+
+exports.path = __dirname
