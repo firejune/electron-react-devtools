@@ -12,6 +12,7 @@
     "email": "firejune@gmail.com",
     "url": "http://firejune.com"
   },
+  "typings": "./index.d.ts",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/firejune/electron-react-devtools/issues"
