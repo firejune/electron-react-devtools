@@ -66,7 +66,7 @@
     "cli-spinners": "^1.0.0",
     "clipboard-js": "^0.3.3",
     "es6-symbol": "3.0.2",
-    "eslint": "2.10.2",
+    "eslint": "6.5.1",
     "eslint-plugin-react": "5.1.1",
     "fbjs": "0.5.1",
     "fbjs-scripts": "0.7.0",
